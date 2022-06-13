@@ -62,6 +62,7 @@ def main():
 def generate_mask(frame, hsv, color):
     mask = cv2.inRange(hsv, np.array(HSV_COLORS[color][0]), np.array(HSV_COLORS[color][1]))
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    #variables to define the area
     num_corner = 0
     first_corner = []
     second_corner = []
@@ -73,15 +74,13 @@ def generate_mask(frame, hsv, color):
         if area > 500:
             cv2.drawContours(frame, [aprox],0, (0), 3)
             i,j = aprox[0][0]
-            if len(aprox) == 3 or len(aprox) == 4:
+            if len(aprox) == 3 or (len(aprox) == 4 and color == 'black'):
                 # computes the centroid of shapes
                 M = cv2.moments(count)
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
                 cv2.circle(frame, (cx,cy), 3, (255,255,255), 2)
-                if len(aprox) == 3:
-                    cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
-                elif len(aprox) == 4: 
+                if len(aprox) == 4 and color == 'black': 
                     if num_corner == 0:
                         first_corner.append(cx)
                         first_corner.append(cy) 
@@ -95,6 +94,8 @@ def generate_mask(frame, hsv, color):
                         first_corner = second_corner = []
                         num_corner = 0
                     cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
+                elif len(aprox) == 3:
+                    cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
     return
 
 
