@@ -48,15 +48,32 @@ def main():
         if recording:
             _, frame = cap.read()
             # converting image obtained to hsv
-            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
+            hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
             # generate masks
-            generate_mask(frame, hsv, 'black')
-            generate_mask(frame, hsv, 'blue')
-            generate_mask(frame, hsv, 'yellow')
-            generate_mask(frame, hsv, 'green') 
+            region = generate_mask(frame, hsv_general, 'black')
+            if not region:
+                pass
+            else:  
+                if region[1][1] > region[0][1] and region[0][0] > region[1][0]:
+                    roi = frame[region[0][1]:region[1][1], region[1][0]:region[0][0]]
+                    
+                elif region[1][1] > region[0][1] and region[0][0] < region[1][0]:
+                    roi = frame[region[0][1]:region[1][1],region[0][0]:region[1][0]]
+               
+                elif region[1][1] < region[0][1] and region[0][0] < region[1][0]:
+                    roi = frame[region[1][1]:region[0][1], region[0][0]:region[1][0]]
+                  
+                elif region[1][1] < region[0][1] and region[0][0] > region[1][0]:
+                    roi = frame[region[1][1]:region[0][1], region[1][0]:region[0][0]]
+
+                hsv_region = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                generate_mask(roi, hsv_region, 'blue')
+                generate_mask(roi, hsv_region, 'yellow')
+                generate_mask(roi, hsv_region, 'green') 
             cv2.waitKey(1)
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
+            
 
 # function to generate each mask and draw contours and name of shapes given the color
 def generate_mask(frame, hsv, color):
@@ -90,6 +107,7 @@ def generate_mask(frame, hsv, color):
                         second_corner.append(cy)
                         num_corner = num_corner + 1 
                         cv2.rectangle(frame, (first_corner[0], first_corner[1]), (second_corner[0], second_corner[1]), (255,255,255), 2)
+                        return first_corner, second_corner
                     elif num_corner == 2:
                         first_corner = second_corner = []
                         num_corner = 0
