@@ -62,7 +62,9 @@ def main():
 def generate_mask(frame, hsv, color):
     mask = cv2.inRange(hsv, np.array(HSV_COLORS[color][0]), np.array(HSV_COLORS[color][1]))
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
+    num_corner = 0
+    first_corner = []
+    second_corner = []
     # get area, and show name of shape
     for count in contours:  
         epsilon = 0.01 * cv2.arcLength(count, True)
@@ -71,15 +73,28 @@ def generate_mask(frame, hsv, color):
         if area > 500:
             cv2.drawContours(frame, [aprox],0, (0), 3)
             i,j = aprox[0][0]
-            # computes the centroid of triangles
-            M = cv2.moments(count)
-            cx = int(M['m10'] / M['m00'])
-            cy = int(M['m01'] / M['m00'])
-            cv2.circle(frame, (cx,cy), 3, (255,255,255), 2)
-            if len(aprox) == 3:
-                cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
-            elif len(aprox) == 4:
-                cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
+            if len(aprox) == 3 or len(aprox) == 4:
+                # computes the centroid of shapes
+                M = cv2.moments(count)
+                cx = int(M['m10'] / M['m00'])
+                cy = int(M['m01'] / M['m00'])
+                cv2.circle(frame, (cx,cy), 3, (255,255,255), 2)
+                if len(aprox) == 3:
+                    cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
+                elif len(aprox) == 4: 
+                    if num_corner == 0:
+                        first_corner.append(cx)
+                        first_corner.append(cy) 
+                        num_corner = num_corner + 1 
+                    elif num_corner == 1:
+                        second_corner.append(cx)
+                        second_corner.append(cy)
+                        num_corner = num_corner + 1 
+                        cv2.rectangle(frame, (first_corner[0], first_corner[1]), (second_corner[0], second_corner[1]), (255,255,255), 2)
+                    elif num_corner == 2:
+                        first_corner = second_corner = []
+                        num_corner = 0
+                    cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
     return
 
 
