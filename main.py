@@ -89,9 +89,9 @@ def generate_mask(frame, hsv, color):
         aprox = cv2.approxPolyDP(count, epsilon, True)
         area = cv2.contourArea(count)
         if area > 500:
-            cv2.drawContours(frame, [aprox],0, (0), 3)
-            i,j = aprox[0][0]
             if len(aprox) == 3 or (len(aprox) == 4 and color == 'black'):
+                cv2.drawContours(frame, [aprox],0, (0), 3)
+                i,j = aprox[0][0]
                 # computes the centroid of shapes
                 M = cv2.moments(count)
                 cx = int(M['m10'] / M['m00'])
