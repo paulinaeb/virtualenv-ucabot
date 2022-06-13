@@ -57,6 +57,7 @@ def main():
             if not region:
                 pass
             else:  
+                print(region)
                 if region[1][1] > region[0][1] and region[0][0] > region[1][0]:
                     roi = frame[region[0][1]:region[1][1], region[1][0]:region[0][0]]
                     
@@ -132,7 +133,7 @@ def generate_mask(frame, hsv, color):
                             y_point.append(y)
                         i = i + 1
                     min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
-                    print('min angle: ', min_angle)
+                    print('min angle: ', min_angle[0], 'vertice:', min_angle[1],' ', min_angle[2])
     return
 
 
@@ -163,11 +164,11 @@ def get_angle(x1, y1, x2, y2, x3, y3):
     gamma = gamma * 180 / math.pi;
     # return lower angle
     if gamma > alpha < beta:
-        return alpha
+        return alpha, x1 , y1
     elif gamma > beta < alpha:
-        return beta
+        return beta, x3, y3
     elif beta > gamma < alpha:
-        return gamma
+        return gamma, x2, y2
 
 
 if __name__=='__main__':
