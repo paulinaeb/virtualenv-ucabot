@@ -1,6 +1,8 @@
+from cmath import acos
 import PySimpleGUI as sg
 import cv2
 import numpy as np 
+import math
 
 # constants
 # colors in hsv dict for masks. the first value represents the lower limit and the second the lower
@@ -113,7 +115,9 @@ def generate_mask(frame, hsv, color):
                     elif num_corner == 2:
                         first_corner = second_corner = []
                         num_corner = 0
-                elif len(aprox) == 3:
+                elif len(aprox) == 3 and color !='black':
+                    x_point = []
+                    y_point = []
                     # triangles
                     n = aprox.ravel()
                     i = 0
@@ -124,23 +128,46 @@ def generate_mask(frame, hsv, color):
                             # String containing the co-ordinates.
                             string = str(x) + " " + str(y) 
                             cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0)) 
+                            x_point.append(x)
+                            y_point.append(y)
                         i = i + 1
+                    min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
+                    print('min angle: ', min_angle)
     return
 
 
-def distance(x1, x2, y1, y2):
+def line_length(x1, y1, x2, y2):
     x_dif = x1-y1
     y_dif = x2-y2
     return x_dif * x_dif + y_dif * y_dif
 
 
-def getAngle():
-    # A-C
+def get_angle(x1, y1, x2, y2, x3, y3):
+    # bc
+    a2 = line_length(x2, y2, x3, y3)
+    # ac
+    b2 = line_length(x1, y1, x3, y3)
+    # ab
+    c2 = line_length(x1, y1, x2, y2)
     
-    # C-B
+    a = math.sqrt(a2)
+    b = math.sqrt(b2)
+    c = math.sqrt(c2)
     
-    # B - A
-    pass
+    alpha = math.acos((b2 + c2 - a2) / (2 * b * c))
+    beta = math.acos((a2 + c2 -b2) / (2 * a * c))
+    gamma = math.acos((a2 + b2 - c2) / (2 * a * b))
+    # Converting to degree
+    alpha = alpha * 180 / math.pi;
+    beta = beta * 180 / math.pi;
+    gamma = gamma * 180 / math.pi;
+    # return lower angle
+    if gamma > alpha < beta:
+        return alpha
+    elif gamma > beta < alpha:
+        return beta
+    elif beta > gamma < alpha:
+        return gamma
 
 
 if __name__=='__main__':
