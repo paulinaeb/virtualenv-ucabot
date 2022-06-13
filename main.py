@@ -2,6 +2,7 @@ from enum import Flag
 import PySimpleGUI as sg
 import cv2
 import numpy as np
+import imutils
 
 # constants
 # colors in hsv dict for masks. the first value represents the lower limit and the second the lower
@@ -63,8 +64,9 @@ def main():
 def generate_mask(frame, hsv, color):
     mask = cv2.inRange(hsv, np.array(HSV_COLORS[color][0]), np.array(HSV_COLORS[color][1]))
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # contours = imutils.grab_contours(contours)
     # get area, and show name of shape
-    for count in contours: 
+    for count in contours:  
         epsilon = 0.01 * cv2.arcLength(count, True)
         aprox = cv2.approxPolyDP(count, epsilon, True)
         area = cv2.contourArea(count)
@@ -72,6 +74,11 @@ def generate_mask(frame, hsv, color):
             cv2.drawContours(frame, [aprox],0, (0), 3)
             i,j = aprox[0][0]
             if len(aprox) == 3:
+                # computes the centroid of triangles
+                M = cv2.moments(count)
+                cx = int(M['m10'] / M['m00'])
+                cy = int(M['m01'] / M['m00'])
+                cv2.circle(frame, (cx,cy), 7, (0,255,0), 2)
                 cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
             elif len(aprox) == 4:
                 cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
