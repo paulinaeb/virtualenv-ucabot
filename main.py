@@ -1,8 +1,6 @@
-from enum import Flag
 import PySimpleGUI as sg
 import cv2
-import numpy as np
-import imutils
+import numpy as np 
 
 # constants
 # colors in hsv dict for masks. the first value represents the lower limit and the second the lower
@@ -28,7 +26,7 @@ def main():
     #indicates which camera use
     cap = cv2.VideoCapture(0)
     recording = False
-    # Event LOOP Read and display frames, operate the GUI 
+    # Event loop Read and display frames, operate the GUI 
     while True:
         event, values = window.read(timeout=20)
         if event == 'Exit' or event == sg.WIN_CLOSED:
@@ -64,7 +62,7 @@ def main():
 def generate_mask(frame, hsv, color):
     mask = cv2.inRange(hsv, np.array(HSV_COLORS[color][0]), np.array(HSV_COLORS[color][1]))
     contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    # contours = imutils.grab_contours(contours)
+
     # get area, and show name of shape
     for count in contours:  
         epsilon = 0.01 * cv2.arcLength(count, True)
@@ -73,12 +71,12 @@ def generate_mask(frame, hsv, color):
         if area > 500:
             cv2.drawContours(frame, [aprox],0, (0), 3)
             i,j = aprox[0][0]
+            # computes the centroid of triangles
+            M = cv2.moments(count)
+            cx = int(M['m10'] / M['m00'])
+            cy = int(M['m01'] / M['m00'])
+            cv2.circle(frame, (cx,cy), 3, (255,255,255), 2)
             if len(aprox) == 3:
-                # computes the centroid of triangles
-                M = cv2.moments(count)
-                cx = int(M['m10'] / M['m00'])
-                cy = int(M['m01'] / M['m00'])
-                cv2.circle(frame, (cx,cy), 7, (0,255,0), 2)
                 cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
             elif len(aprox) == 4:
                 cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
