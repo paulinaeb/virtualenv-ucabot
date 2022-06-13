@@ -6,7 +6,7 @@ import numpy as np
 # colors in hsv dict for masks. the first value represents the lower limit and the second the lower
 HSV_COLORS = {
     'blue': [[90,60,0], [121,255,255]], 
-    'green': [[40,70,80], [70,255,255]],
+    'green': [[36, 50, 70], [89,255,255]],
     'yellow': [[20, 100, 100], [30, 255, 255]],
     'black': [[0, 0, 0], [180,255,30]]
 }
@@ -24,13 +24,14 @@ def main():
     # create the window and show it without the plot
     window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 150))
     #indicates which camera use
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     recording = False
     # Event loop Read and display frames, operate the GUI 
     while True:
         event, values = window.read(timeout=20)
         if event == 'Exit' or event == sg.WIN_CLOSED:
-            cap.release()
+            if recording:
+                cap.release()
             return
 
         elif event == 'Start':
@@ -65,11 +66,11 @@ def main():
                   
                 elif region[1][1] < region[0][1] and region[0][0] > region[1][0]:
                     roi = frame[region[1][1]:region[0][1], region[1][0]:region[0][0]]
-
                 hsv_region = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
                 generate_mask(roi, hsv_region, 'blue')
                 generate_mask(roi, hsv_region, 'yellow')
                 generate_mask(roi, hsv_region, 'green') 
+                
             cv2.waitKey(1)
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
@@ -98,6 +99,7 @@ def generate_mask(frame, hsv, color):
                 cy = int(M['m01'] / M['m00'])
                 cv2.circle(frame, (cx,cy), 3, (255,255,255), 2)
                 if len(aprox) == 4 and color == 'black': 
+                    # rectangles - marks
                     if num_corner == 0:
                         first_corner.append(cx)
                         first_corner.append(cy) 
@@ -111,10 +113,34 @@ def generate_mask(frame, hsv, color):
                     elif num_corner == 2:
                         first_corner = second_corner = []
                         num_corner = 0
-                    cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
                 elif len(aprox) == 3:
-                    cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
+                    # triangles
+                    n = aprox.ravel()
+                    i = 0
+                    for j in n :
+                        if(i % 2 == 0):
+                            x = n[i]
+                            y = n[i + 1]
+                            # String containing the co-ordinates.
+                            string = str(x) + " " + str(y) 
+                            cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0)) 
+                        i = i + 1
     return
+
+
+def distance(x1, x2, y1, y2):
+    x_dif = x1-y1
+    y_dif = x2-y2
+    return x_dif * x_dif + y_dif * y_dif
+
+
+def getAngle():
+    # A-C
+    
+    # C-B
+    
+    # B - A
+    pass
 
 
 if __name__=='__main__':
