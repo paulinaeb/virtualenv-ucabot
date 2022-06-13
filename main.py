@@ -27,7 +27,6 @@ def main():
     #indicates which camera use
     cap = cv2.VideoCapture(0)
     recording = False
-
     # Event LOOP Read and display frames, operate the GUI 
     while True:
         event, values = window.read(timeout=20)
@@ -49,27 +48,34 @@ def main():
 
         if recording:
             _, frame = cap.read()
+            # converting image obtained to hsv
             hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
-            mask = cv2.inRange(hsv, np.array(HSV_COLORS['black'][0]), np.array(HSV_COLORS['black'][1]))
-            # cv2.imshow('mask',mask) to see masks
-            contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-            for count in contours: 
-                epsilon = 0.01 * cv2.arcLength(count, True)
-                aprox = cv2.approxPolyDP(count, epsilon, True)
-                cv2.drawContours(frame, [aprox],0, (0), 3)
-                i,j = aprox[0][0]
-                if len(aprox) == 3:
-                    cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
-                elif len(aprox) == 4:
-                    cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
-            
+            # generate masks
+            generate_mask(frame, hsv, 'black')
+            generate_mask(frame, hsv, 'blue')
+            generate_mask(frame, hsv, 'yellow')
+            generate_mask(frame, hsv, 'green') 
             cv2.waitKey(1)
-            imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
+            imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
 
-
-def generate_mask():
-    pass
+# function to generate each mask and draw contours and name of shapes given the color
+def generate_mask(frame, hsv, color):
+    mask = cv2.inRange(hsv, np.array(HSV_COLORS[color][0]), np.array(HSV_COLORS[color][1]))
+    contours, _ = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # get area, and show name of shape
+    for count in contours: 
+        epsilon = 0.01 * cv2.arcLength(count, True)
+        aprox = cv2.approxPolyDP(count, epsilon, True)
+        area = cv2.contourArea(count)
+        if area > 500:
+            cv2.drawContours(frame, [aprox],0, (0), 3)
+            i,j = aprox[0][0]
+            if len(aprox) == 3:
+                cv2.putText(frame, "triangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
+            elif len(aprox) == 4:
+                cv2.putText(frame, "rectangle", (i,j), cv2.FONT_HERSHEY_COMPLEX, 1, 0, 2)
+    return
 
 
 if __name__=='__main__':
