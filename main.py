@@ -13,6 +13,14 @@ HSV_COLORS = {
     'black': [[0, 0, 0], [180,255,30]]
 }
 
+# viewport new values
+NEW_MIN = 0
+NEW_MAX = 100
+
+def new_value(valor, min_previo, max_previo):
+    value = (((valor - min_previo) / (max_previo - min_previo))*(NEW_MAX - NEW_MIN) + NEW_MIN)
+    return value
+
 # remember to activate virtual environment before running this
 def main():
     sg.theme('Black')
@@ -57,7 +65,7 @@ def main():
             if not region:
                 pass
             else:  
-                print(region)
+                # define region of interest and viewport
                 if region[1][1] > region[0][1] and region[0][0] > region[1][0]:
                     roi = frame[region[0][1]:region[1][1], region[1][0]:region[0][0]]
                     
@@ -69,10 +77,14 @@ def main():
                   
                 elif region[1][1] < region[0][1] and region[0][0] > region[1][0]:
                     roi = frame[region[1][1]:region[0][1], region[1][0]:region[0][0]]
+                # print(region)
                 hsv_region = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
                 generate_mask(roi, hsv_region, 'blue')
                 generate_mask(roi, hsv_region, 'yellow')
                 generate_mask(roi, hsv_region, 'green') 
+
+                cv2.putText(frame, str(str(NEW_MIN)+','+str(NEW_MIN)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
+                cv2.putText(frame, str(str(NEW_MAX)+','+str(NEW_MAX)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
                 
             cv2.waitKey(1)
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
@@ -117,6 +129,7 @@ def generate_mask(frame, hsv, color):
                         first_corner = second_corner = []
                         num_corner = 0
                 elif len(aprox) == 3 and color !='black':
+                    diff_x = diff_y = direction_angle = 0
                     x_point = []
                     y_point = []
                     # triangles
@@ -127,13 +140,21 @@ def generate_mask(frame, hsv, color):
                             x = n[i]
                             y = n[i + 1]
                             # String containing the co-ordinates.
-                            string = str(x) + " " + str(y) 
-                            cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0)) 
+                            # string = str(x) + " " + str(y) 
+                            # cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 255, 0)) 
                             x_point.append(x)
                             y_point.append(y)
                         i = i + 1
                     min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
-                    print('min angle: ', min_angle[0], 'vertice:', min_angle[1],' ', min_angle[2])
+                    # # get direction of the triangle using min angle triangle vertices and centroid
+                    if cx and cy and min_angle[1] and min_angle[0]:
+                        diff_x = min_angle[1] - cx
+                        diff_y = min_angle[2] - cy
+                        direction_angle = int(math.atan2(diff_y, diff_x) * (180 / math.pi))
+                        print('Angulo en grados: ' + str(direction_angle))
+                        cv2.putText(frame, str(direction_angle), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
+                    # print('min angle: ', min_angle[0], 'vertice:', min_angle[1],' ', min_angle[2])
+                    # cv2.putText(frame, str(int(min_angle[0])), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
     return
 
 
