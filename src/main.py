@@ -70,16 +70,16 @@ def main():
                   
                 elif region[1][1] < region[0][1] and region[0][0] > region[1][0]:
                     roi = frame[region[1][1]:region[0][1], region[1][0]:region[0][0]]
-                # print(region)
+                print(region)
+                # getting hsv of viewport
                 hsv_region = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+                # generating masks for other colors
                 generate_mask(roi, hsv_region, 'blue')
                 generate_mask(roi, hsv_region, 'yellow')
                 generate_mask(roi, hsv_region, 'green') 
-
-                cv2.putText(frame, str(str(data.NEW_MIN)+','+str(data.NEW_MIN)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
-                cv2.putText(frame, str(str(data.NEW_MAX)+','+str(data.NEW_MAX)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
-            
-            cv2.waitKey(1)
+                # shows origin and max limit of viewport
+                cv2.putText(frame, (str(data.NEW_MIN)+','+str(data.NEW_MIN)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
+                cv2.putText(frame, (str(data.NEW_MAX)+','+str(data.NEW_MAX)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
             
