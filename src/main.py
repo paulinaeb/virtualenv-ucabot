@@ -46,18 +46,18 @@ def main():
             cap.release()
 
         if recording:
+            frame = 0
             _, frame = cap.read()
             # converting image obtained to hsv, if exists
-            if frame:
-                hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            else:
+            if frame is None:
                 print('Something went wrong trying to connect to your camera. Please verify.')
                 return
-            # generate masks
+            else:
+                hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            # generate mask to define region of interest (viewport)
             region = generate_mask(frame, hsv_general, 'black')
-            if not region:
-                pass
-            else:  
+            # if two black marks exist 
+            if region:  
                 # define region of interest and viewport
                 if region[1][1] > region[0][1] and region[0][0] > region[1][0]:
                     roi = frame[region[0][1]:region[1][1], region[1][0]:region[0][0]]
@@ -78,7 +78,7 @@ def main():
 
                 cv2.putText(frame, str(str(data.NEW_MIN)+','+str(data.NEW_MIN)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
                 cv2.putText(frame, str(str(data.NEW_MAX)+','+str(data.NEW_MAX)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
-                
+            
             cv2.waitKey(1)
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
