@@ -6,8 +6,8 @@ import math
 import data
 
 
-def new_value(valor, min_previo, max_previo):
-    value = (((valor - min_previo) / (max_previo - min_previo))*(data.NEW_MAX - data.NEW_MIN) + data.NEW_MIN)
+def new_value(valor, min_prev, max_prev):
+    value = (((valor - min_prev) / (max_prev - min_prev))*(data.NEW_MAX - data.NEW_MIN) + data.NEW_MIN)
     return value
 
 # remember to activate virtual environment before running this
@@ -47,8 +47,12 @@ def main():
 
         if recording:
             _, frame = cap.read()
-            # converting image obtained to hsv
-            hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV) 
+            # converting image obtained to hsv, if exists
+            if frame:
+                hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            else:
+                print('Something went wrong trying to connect to your camera. Please verify.')
+                return
             # generate masks
             region = generate_mask(frame, hsv_general, 'black')
             if not region:
