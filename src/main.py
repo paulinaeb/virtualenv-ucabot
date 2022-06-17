@@ -135,6 +135,7 @@ def generate_mask(frame, hsv, color):
                         num_corner = 0
                         
                 elif len(approx) == 3 and color !='black':
+                    id_robot = get_id(color)
                     # triangles 
                     x_point = []
                     y_point = []
@@ -152,9 +153,21 @@ def generate_mask(frame, hsv, color):
                         i = i + 1
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
-                    cv2.putText(frame, str(direction_angle(cx, cy, min_angle[1], min_angle[2])), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
+                    direction = direction_angle(cx, cy, min_angle[1], min_angle[2])
+                    cv2.putText(frame, str(id_robot), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    cv2.putText(frame, str(cx)+' '+ str(cy)+' '+str(direction), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     # cv2.putText(frame, str(int(min_angle[0])), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
     return
+
+# get if of robots in function of color given
+def get_id(color):
+    if color == 'blue':
+        robot_id = 1
+    if color == 'green':
+        robot_id = 2
+    if color == 'yellow':
+        robot_id = 3
+    return robot_id
 
 # get direction of the triangle using min angle triangle vertices and centroid
 def direction_angle(cx, cy, vx, vy):
@@ -177,7 +190,7 @@ def line_length(x1, y1, x2, y2):
     y_dif = y1-y2
     return x_dif * x_dif + y_dif * y_dif
 
-
+# get all angles of given 3 points of triangle 
 def get_angle(x1, y1, x2, y2, x3, y3):
     # bc
     a2 = line_length(x2, y2, x3, y3)
