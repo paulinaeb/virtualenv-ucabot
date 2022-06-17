@@ -7,12 +7,12 @@ import data
 
 def new_x(valor, min_prev, max_prev):
     value = ((valor - min_prev) / (max_prev - min_prev))*(data.NEW_MAX - data.NEW_MIN) + data.NEW_MIN
-    return value
+    return int(value)
 
 
 def new_y(valor, min_prev, max_prev):
     value = (((min_prev - valor) * (data.NEW_MAX - data.NEW_MIN)) / (min_prev - max_prev)) + data.NEW_MIN
-    return value
+    return int(value)
 
 # remember to activate virtual environment before running this
 def main():
@@ -74,17 +74,19 @@ def main():
                   
                 elif region[1][1] < region[0][1] and region[0][0] > region[1][0]:
                     roi = frame[region[1][1]:region[0][1], region[1][0]:region[0][0]]
-                # print(region)
                 # getting hsv of viewport
                 hsv_region = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
                 # generating masks for other colors
                 generate_mask(roi, hsv_region, 'blue')
                 generate_mask(roi, hsv_region, 'yellow')
                 generate_mask(roi, hsv_region, 'green') 
-                # shows origin and max limit of viewport
-                                
-                # cv2.putText(frame, (str(data.NEW_MIN)+','+str(data.NEW_MIN)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
-                # cv2.putText(frame, (str(data.NEW_MAX)+','+str(data.NEW_MAX)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
+                # calculates and shows origin and max limit of viewport
+                min_x = new_x(region[0][0], region[0][0], region[1][0]) 
+                max_x = new_x(region[1][0], region[0][0], region[1][0]) 
+                min_y = new_y(region[0][1], region[0][1], region[1][1])
+                max_y = new_y(region[1][1], region[0][1], region[1][1])
+                cv2.putText(frame, (str(max_x)+','+str(max_y)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
+                cv2.putText(frame, (str(min_x)+','+str(min_y)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
             
@@ -113,6 +115,7 @@ def generate_mask(frame, hsv, color):
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
                 cv2.circle(frame, (cx,cy), 2, (255,255,255), 2)
+                
                 if len(approx) == 4 and color == 'black': 
                     # rectangles - marks
                     if num_corner == 0:
@@ -131,8 +134,7 @@ def generate_mask(frame, hsv, color):
                         first_corner = second_corner = []
                         num_corner = 0
                 elif len(approx) == 3 and color !='black':
-                    # triangles
-                    # diff_x = diff_y = direction_angle = 0
+                    # triangles 
                     x_point = []
                     y_point = []
                     n = approx.ravel()
@@ -165,7 +167,7 @@ def direction_angle(cx, cy, vx, vy):
     direction_angle = int(direction_angle * (180 / math.pi))
     if vy > cy:
         direction_angle = 360 - direction_angle 
-    print('Angulo en grados: ' + str(direction_angle))
+    # print('Angulo en grados: ' + str(direction_angle))
     return direction_angle
 
 
