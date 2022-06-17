@@ -133,6 +133,7 @@ def generate_mask(frame, hsv, color):
                         # reset values
                         first_corner = second_corner = []
                         num_corner = 0
+                        
                 elif len(approx) == 3 and color !='black':
                     # triangles 
                     x_point = []
