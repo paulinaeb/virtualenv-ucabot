@@ -1,14 +1,17 @@
-from cmath import acos
 import PySimpleGUI as sg
 import cv2
-from cv2 import sqrt
 import numpy as np 
 import math
 import data
 
 
-def new_value(valor, min_prev, max_prev):
-    value = (((valor - min_prev) / (max_prev - min_prev))*(data.NEW_MAX - data.NEW_MIN) + data.NEW_MIN)
+def new_x(valor, min_prev, max_prev):
+    value = ((valor - min_prev) / (max_prev - min_prev))*(data.NEW_MAX - data.NEW_MIN) + data.NEW_MIN
+    return value
+
+
+def new_y(valor, min_prev, max_prev):
+    value = (((min_prev - valor) * (data.NEW_MAX - data.NEW_MIN)) / (min_prev - max_prev)) + data.NEW_MIN
     return value
 
 # remember to activate virtual environment before running this
@@ -79,8 +82,9 @@ def main():
                 generate_mask(roi, hsv_region, 'yellow')
                 generate_mask(roi, hsv_region, 'green') 
                 # shows origin and max limit of viewport
-                cv2.putText(frame, (str(data.NEW_MIN)+','+str(data.NEW_MIN)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
-                cv2.putText(frame, (str(data.NEW_MAX)+','+str(data.NEW_MAX)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
+                                
+                # cv2.putText(frame, (str(data.NEW_MIN)+','+str(data.NEW_MIN)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
+                # cv2.putText(frame, (str(data.NEW_MAX)+','+str(data.NEW_MAX)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
             
@@ -128,7 +132,7 @@ def generate_mask(frame, hsv, color):
                         num_corner = 0
                 elif len(approx) == 3 and color !='black':
                     # triangles
-                    diff_x = diff_y = direction_angle = 0
+                    # diff_x = diff_y = direction_angle = 0
                     x_point = []
                     y_point = []
                     n = approx.ravel()
@@ -137,32 +141,32 @@ def generate_mask(frame, hsv, color):
                         if(i % 2 == 0):
                             x = n[i]
                             y = n[i + 1]
-                            # String containing the co-ordinates.
-                            string = str(x) + " " + str(y) 
-                            cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255)) 
+                            # # String containing the co-ordinates.
+                            # string = str(x) + " " + str(y) 
+                            # cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255)) 
                             x_point.append(x)
                             y_point.append(y)
                         i = i + 1
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
-                    # get direction of the triangle using min angle triangle vertices and centroid
-                    vx = min_angle[1]
-                    vy = min_angle[2]
-                    diff_x = vx - cx
-                    # diff_y = vy - cy
-                    diff_y = cy - vy
-                    print('cx', cx, 'cy', cy,'vx',vx, 'vy', vy)
-                    # direction_angle = int(math.atan(diff_y/diff_x) * (180 / math.pi))
-                    h = math.sqrt((diff_x*diff_x) + (diff_y*diff_y))
-                    direction_angle = math.acos (diff_x / (h))
-                    direction_angle = int(direction_angle * (180 / math.pi))
-                    if vy > cy:
-                        direction_angle = 360 - direction_angle 
-                    print('Angulo en grados: ' + str(direction_angle))
-                    cv2.putText(frame, str(direction_angle), (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
-                    # print('min angle: ', min_angle[0], 'vertice:', min_angle[1],' ', min_angle[2])
+                    cv2.putText(frame, str(direction_angle(cx, cy, min_angle[1], min_angle[2])), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
                     # cv2.putText(frame, str(int(min_angle[0])), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
     return
+
+# get direction of the triangle using min angle triangle vertices and centroid
+def direction_angle(cx, cy, vx, vy):
+    diff_x = vx - cx
+    # cy and vy are inverted because camera orientation in Y is inverted
+    diff_y = cy - vy
+    # hypotenuse of the rectangle triangle formed with X and the line between C and min angle V
+    h = math.sqrt((diff_x*diff_x) + (diff_y*diff_y))
+    direction_angle = math.acos (diff_x / (h))
+    # transform result to degrees
+    direction_angle = int(direction_angle * (180 / math.pi))
+    if vy > cy:
+        direction_angle = 360 - direction_angle 
+    print('Angulo en grados: ' + str(direction_angle))
+    return direction_angle
 
 
 def line_length(x1, y1, x2, y2):
@@ -191,7 +195,7 @@ def get_angle(x1, y1, x2, y2, x3, y3):
     beta = int(beta * 180 / math.pi);
     gamma = int(gamma * 180 / math.pi);
     
-    # return lower angle
+    # return lower angle and its coordinates
     if gamma > alpha < beta: 
         return alpha, x1 , y1
     elif gamma > beta < alpha: 
