@@ -4,9 +4,11 @@ import numpy as np
 import math
 import data
 
+# global variables
+min_prev_x = min_prev_y = max_prev_x = max_prev_y = 0
 
 def new_x(valor, min_prev, max_prev):
-    value = ((valor - min_prev) / (max_prev - min_prev))*(data.NEW_MAX - data.NEW_MIN) + data.NEW_MIN
+    value = (((valor - min_prev) * (data.NEW_MAX - data.NEW_MIN)) / (max_prev - min_prev)) + data.NEW_MIN
     return int(value)
 
 
@@ -27,7 +29,7 @@ def main():
     # create the window and show it without the plot
     window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 150))
     #indicates which camera use
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     recording = False
     # Event loop Read and display frames, operate the GUI 
     while True:
@@ -61,32 +63,26 @@ def main():
             # generate mask to define region of interest (viewport)
             region = generate_mask(frame, hsv_general, 'black')
             # if two black marks exist 
-            if region:  
-                # define region of interest and viewport
-                if region[1][1] > region[0][1] and region[0][0] > region[1][0]:
-                    roi = frame[region[0][1]:region[1][1], region[1][0]:region[0][0]]
-                    
-                elif region[1][1] > region[0][1] and region[0][0] < region[1][0]:
-                    roi = frame[region[0][1]:region[1][1],region[0][0]:region[1][0]]
-               
-                elif region[1][1] < region[0][1] and region[0][0] < region[1][0]:
-                    roi = frame[region[1][1]:region[0][1], region[0][0]:region[1][0]]
-                  
-                elif region[1][1] < region[0][1] and region[0][0] > region[1][0]:
-                    roi = frame[region[1][1]:region[0][1], region[1][0]:region[0][0]]
-                # getting hsv of viewport
-                hsv_region = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-                # generating masks for other colors
-                generate_mask(roi, hsv_region, 'blue')
-                generate_mask(roi, hsv_region, 'yellow')
-                generate_mask(roi, hsv_region, 'green') 
+            if region:   
+                global min_prev_x
+                min_prev_x = region[0][0]
+                global min_prev_y
+                min_prev_y = region[0][1]
+                global max_prev_x
+                max_prev_x = region[1][0]
+                global max_prev_y
+                max_prev_y = region[1][1] 
                 # calculates and shows origin and max limit of viewport
-                min_x = new_x(region[0][0], region[0][0], region[1][0]) 
-                max_x = new_x(region[1][0], region[0][0], region[1][0]) 
-                min_y = new_y(region[0][1], region[0][1], region[1][1])
-                max_y = new_y(region[1][1], region[0][1], region[1][1])
-                cv2.putText(frame, (str(max_x)+','+str(max_y)), (int(region[1][0]), int(region[1][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
-                cv2.putText(frame, (str(min_x)+','+str(min_y)), (int(region[0][0]), int(region[0][1])), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0))
+                min_x = new_x(region[0][0], min_prev_x, max_prev_x) 
+                max_x = new_x(region[1][0], min_prev_x, max_prev_x) 
+                min_y = new_y(region[0][1], min_prev_y, max_prev_y)
+                max_y = new_y(region[1][1], min_prev_y, max_prev_y)
+                cv2.putText(frame, (str(min_x)+','+str(min_y)), (int(min_prev_x), int(min_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                cv2.putText(frame, (str(max_x)+','+str(max_y)), (int(max_prev_x), int(max_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                # generating masks for other colors
+                generate_mask(frame, hsv_general, 'blue')
+                generate_mask(frame, hsv_general, 'yellow')
+                generate_mask(frame, hsv_general, 'green') 
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
             
@@ -107,56 +103,64 @@ def generate_mask(frame, hsv, color):
         # get area to work with only visible objects
         area = cv2.contourArea(count)
         if area > 500:
-            # recognize triangles or rectangles
-            if len(approx) == 3 or (len(approx) == 4 and color == 'black'):
-                cv2.drawContours(frame, [approx],0, (0), 2)
+            # recognize triangles or rectangles 
+            if len(approx) == 4 and color == 'black': 
                 # computes the centroid of shapes
                 M = cv2.moments(count)
                 cx = int(M['m10'] / M['m00'])
                 cy = int(M['m01'] / M['m00'])
                 cv2.circle(frame, (cx,cy), 2, (255,255,255), 2)
-                
-                if len(approx) == 4 and color == 'black': 
-                    # rectangles - marks
-                    if num_corner == 0:
-                        first_corner.append(cx)
-                        first_corner.append(cy) 
-                        num_corner = num_corner + 1 
-                    elif num_corner == 1:
-                        second_corner.append(cx)
-                        second_corner.append(cy)
-                        num_corner = num_corner + 1 
-                        # draws the region of interest as a rectangle
-                        cv2.rectangle(frame, (first_corner[0], first_corner[1]), (second_corner[0], second_corner[1]), (255,255,255), 2)
-                        return first_corner, second_corner
-                    elif num_corner == 2:
-                        # reset values
-                        first_corner = second_corner = []
-                        num_corner = 0
+                # rectangles - marks
+                if num_corner == 0:
+                    first_corner.append(cx)
+                    first_corner.append(cy) 
+                    num_corner = num_corner + 1 
+                elif num_corner == 1:
+                    second_corner.append(cx)
+                    second_corner.append(cy)
+                    num_corner = num_corner + 1 
+                    # draws the region of interest as a rectangle
+                    cv2.rectangle(frame, (first_corner[0], first_corner[1]), (second_corner[0], second_corner[1]), (255,255,255), 2)
+                    return first_corner, second_corner
+                elif num_corner == 2:
+                    # reset values
+                    first_corner = second_corner = []
+                    num_corner = 0
                         
-                elif len(approx) == 3 and color !='black':
+            elif len(approx) == 3 and color !='black':
+                flag = 0
+                # triangles 
+                x_point = []
+                y_point = []
+                n = approx.ravel()
+                i = 0
+                for j in n :
+                    if(i % 2 == 0):
+                        x = n[i]
+                        y = n[i + 1] 
+                        if (max_prev_x > x > min_prev_x) and (min_prev_y > y > max_prev_y):
+                            flag = flag + 1 
+                        # String containing the co-ordinates.
+                        # string = str(x) + " " + str(y) 
+                        # cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255)) 
+                        x_point.append(x)
+                        y_point.append(y)
+                    i = i + 1
+                if flag == 3 :
                     id_robot = get_id(color)
-                    # triangles 
-                    x_point = []
-                    y_point = []
-                    n = approx.ravel()
-                    i = 0
-                    for j in n :
-                        if(i % 2 == 0):
-                            x = n[i]
-                            y = n[i + 1]
-                            # # String containing the co-ordinates.
-                            # string = str(x) + " " + str(y) 
-                            # cv2.putText(frame, string, (x, y), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255)) 
-                            x_point.append(x)
-                            y_point.append(y)
-                        i = i + 1
+                    cv2.drawContours(frame, [approx],0, (0), 2)
+                    # computes the centroid of shapes
+                    M = cv2.moments(count)
+                    cx = int(M['m10'] / M['m00'])
+                    cy = int(M['m01'] / M['m00']) 
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
                     direction = direction_angle(cx, cy, min_angle[1], min_angle[2])
                     cv2.putText(frame, str(id_robot), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
-                    cv2.putText(frame, str(cx)+' '+ str(cy)+' '+str(direction), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
-                    # cv2.putText(frame, str(int(min_angle[0])), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 0, 0)) 
+                    # convert position (cx cy) to viewport 
+                    cx = new_x(cx, min_prev_x, max_prev_x) 
+                    cy = new_y(cy, min_prev_y, max_prev_y) 
+                    cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
     return
 
 # get if of robots in function of color given
@@ -181,7 +185,6 @@ def direction_angle(cx, cy, vx, vy):
     direction_angle = int(direction_angle * (180 / math.pi))
     if vy > cy:
         direction_angle = 360 - direction_angle 
-    # print('Angulo en grados: ' + str(direction_angle))
     return direction_angle
 
 
