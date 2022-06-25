@@ -86,7 +86,7 @@ def main():
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
             
-
+temp_x = temp_y = 0
 # function to generate each mask and draw contours and name of shapes given the color
 def generate_mask(frame, hsv, color):
     mask = cv2.inRange(hsv, np.array(data.HSV_COLORS[color][0]), np.array(data.HSV_COLORS[color][1]))
@@ -155,17 +155,33 @@ def generate_mask(frame, hsv, color):
                     cy = int(M['m01'] / M['m00']) 
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
-                    direction = direction_angle(cx, cy, min_angle[1], min_angle[2])
+                    vx = min_angle[1]
+                    vy = min_angle[2]
+                    direction = direction_angle(cx, cy, vx, vy)
                     cv2.putText(frame, str(id_robot), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
-                    # convert position (cx cy) to viewport 
-                    cx = new_x(cx, min_prev_x, max_prev_x) 
-                    cy = new_y(cy, min_prev_y, max_prev_y) 
-                    cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    if color == 'yellow':
+                        global temp_x
+                        global temp_y
+                        temp_x = cx
+                        temp_y = cy
                     # test rotate function
                     if color == 'blue':
                         # 1 is left and 2 is right
                         rotation = rotate(direction, 20, 2)
-                        
+                        # point where I wish to go
+                        px = temp_x 
+                        py = temp_y
+                        cv2.circle(frame, (px, py), 2, (255,255,255), 2)
+                        if (max_prev_x > px > min_prev_x) and (min_prev_y > py > max_prev_y):
+                            temp = direction_angle(cx, cy, px, py)
+                            angle_to_point = temp - direction
+                            print('angle to point ', angle_to_point)
+                            cv2.putText(frame,str(angle_to_point), (px, py), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0))
+                    # # convert position (cx cy) to viewport 
+                    # cx = new_x(cx, min_prev_x, max_prev_x) 
+                    # cy = new_y(cy, min_prev_y, max_prev_y) 
+                    
+                    cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
     return
 
 # get if of robots in function of color given
@@ -185,7 +201,7 @@ def direction_angle(cx, cy, vx, vy):
     diff_y = cy - vy
     # hypotenuse of the rectangle triangle formed with X and the line between C and min angle V
     h = math.sqrt((diff_x*diff_x) + (diff_y*diff_y))
-    direction_angle = math.acos (diff_x / (h))
+    direction_angle = math.acos (diff_x / h)
     # transform result to degrees
     direction_angle = int(direction_angle * (180 / math.pi))
     if vy > cy:
@@ -248,7 +264,7 @@ def rotate(current_angle, degrees_to_rotate, direction):
     print('m1: ', m1,',','m2: ',m2)
     print('error: ', error)
     return result_angle, m1, m2
-    
+
 
 if __name__=='__main__':
     main()
