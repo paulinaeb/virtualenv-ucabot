@@ -29,7 +29,7 @@ def main():
     # create the window and show it without the plot
     window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 150))
     #indicates which camera use
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     recording = False
     # Event loop Read and display frames, operate the GUI 
     while True:
@@ -161,6 +161,11 @@ def generate_mask(frame, hsv, color):
                     cx = new_x(cx, min_prev_x, max_prev_x) 
                     cy = new_y(cy, min_prev_y, max_prev_y) 
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    # test rotate function
+                    if color == 'blue':
+                        # 1 is left and 2 is right
+                        rotation = rotate(direction, 20, 2)
+                        
     return
 
 # get if of robots in function of color given
@@ -221,6 +226,28 @@ def get_angle(x1, y1, x2, y2, x3, y3):
         return beta, x2, y2
     elif beta > gamma < alpha: 
         return gamma, x3, y3
+
+
+def rotate(current_angle, degrees_to_rotate, direction):
+    result_angle = error = m1 = m2 = 0
+    KP = 5
+    # rotate to left
+    if direction == 1 :
+        result_angle = current_angle + degrees_to_rotate
+    # rotate to right 
+    elif direction == 2:
+        result_angle = current_angle - degrees_to_rotate
+    error = degrees_to_rotate
+    if direction == 1:
+        m1 = -error * KP    
+        m2 = error * KP
+    elif direction == 2:
+        m1 = error * KP
+        m2 = -error * KP
+    print('result angle: ', result_angle)
+    print('m1: ', m1,',','m2: ',m2)
+    print('error: ', error)
+    return result_angle, m1, m2
     
 
 if __name__=='__main__':
