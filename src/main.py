@@ -6,7 +6,12 @@ import data
 
 # global variables
 min_prev_x = min_prev_y = max_prev_x = max_prev_y = 0
+mundo = {'yellow':[],
+         'green':[],
+         'blue':[]
+         }
 
+# window to viewport functions
 def new_x(valor, min_prev, max_prev):
     value = (((valor - min_prev) * (data.NEW_MAX - data.NEW_MIN)) / (max_prev - min_prev)) + data.NEW_MIN
     return int(value)
@@ -15,6 +20,16 @@ def new_x(valor, min_prev, max_prev):
 def new_y(valor, min_prev, max_prev):
     value = (((min_prev - valor) * (data.NEW_MAX - data.NEW_MIN)) / (min_prev - max_prev)) + data.NEW_MIN
     return int(value)
+
+# viewport to window functions
+def vp_2_w_x(value, min_prev, max_prev):
+    new_value = (((value - data.NEW_MIN) * (max_prev - min_prev)) / (data.NEW_MAX - data.NEW_MIN)) + min_prev
+    return int(new_value)
+
+
+def vp_2_w_y(value, min_prev, max_prev):
+    new_value = (((data.NEW_MIN - value) * (min_prev - max_prev)) / (data.NEW_MAX - data.NEW_MIN)) + min_prev
+    return int(new_value)
 
 # remember to activate virtual environment before running this
 def main():
@@ -79,14 +94,21 @@ def main():
                 max_y = new_y(region[1][1], min_prev_y, max_prev_y)
                 cv2.putText(frame, (str(min_x)+','+str(min_y)), (int(min_prev_x), int(min_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                 cv2.putText(frame, (str(max_x)+','+str(max_y)), (int(max_prev_x), int(max_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                # test vp to w function
+                # vx = vp_2_w_x(50, min_prev_x, max_prev_x)
+                # print('x: ',str(vx))
+                # vy = vp_2_w_y(50, min_prev_y, max_prev_y)
+                # print('y: ',str(vy)) 
                 # generating masks for other colors
-                generate_mask(frame, hsv_general, 'blue')
-                generate_mask(frame, hsv_general, 'yellow')
-                generate_mask(frame, hsv_general, 'green') 
+                if not (generate_mask(frame, hsv_general, 'blue')):
+                    mundo['blue'] = []
+                if not (generate_mask(frame, hsv_general, 'yellow')):
+                    mundo['yellow'] = []
+                if not (generate_mask(frame, hsv_general, 'green')):
+                    mundo['green'] = []
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
             
-temp_x = temp_y = 0
 # function to generate each mask and draw contours and name of shapes given the color
 def generate_mask(frame, hsv, color):
     mask = cv2.inRange(hsv, np.array(data.HSV_COLORS[color][0]), np.array(data.HSV_COLORS[color][1]))
@@ -147,7 +169,7 @@ def generate_mask(frame, hsv, color):
                         y_point.append(y)
                     i = i + 1
                 if flag == 3 :
-                    id_robot = get_id(color)
+                    id_agent = get_id(color)
                     cv2.drawContours(frame, [approx],0, (0), 2)
                     # computes the centroid of shapes
                     M = cv2.moments(count)
@@ -158,30 +180,28 @@ def generate_mask(frame, hsv, color):
                     vx = min_angle[1]
                     vy = min_angle[2]
                     direction = direction_angle(cx, cy, vx, vy)
-                    cv2.putText(frame, str(id_robot), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
-                    if color == 'yellow':
-                        global temp_x
-                        global temp_y
-                        temp_x = cx
-                        temp_y = cy
+                    cv2.putText(frame, str(id_agent), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    global mundo
+                    mundo[color] = [id_agent, cx, cy, direction]
+                    # print(mundo)
                     # test rotate function
-                    if color == 'blue':
-                        # 1 is left and 2 is right
-                        rotation = rotate(direction, 20, 2)
-                        # point where I wish to go
-                        px = temp_x 
-                        py = temp_y
-                        cv2.circle(frame, (px, py), 2, (255,255,255), 2)
-                        if (max_prev_x > px > min_prev_x) and (min_prev_y > py > max_prev_y):
-                            temp = direction_angle(cx, cy, px, py)
-                            angle_to_point = temp - direction
-                            print('angle to point ', angle_to_point)
-                            cv2.putText(frame,str(angle_to_point), (px, py), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0))
+                    # if color == 'blue' and mundo['yellow']:
+                    #     # 1 is left and 2 is right
+                    #     rotation = rotate(direction, 20, 2)
+                    #     # point where I wish to go
+                    #     px = mundo['yellow'][1] 
+                    #     py = mundo['yellow'][2] 
+                    #     cv2.circle(frame, (px, py), 2, (255,255,255), 2)
+                    #     temp = direction_angle(cx, cy, px, py)
+                    #     angle_to_point = temp - direction
+                    #     print('angle to point ', angle_to_point)
+                    #     cv2.putText(frame,str(angle_to_point), (px, py), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0))
                     # # convert position (cx cy) to viewport 
                     # cx = new_x(cx, min_prev_x, max_prev_x) 
                     # cy = new_y(cy, min_prev_y, max_prev_y) 
                     
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    return True
     return
 
 # get if of robots in function of color given
@@ -244,27 +264,40 @@ def get_angle(x1, y1, x2, y2, x3, y3):
         return gamma, x3, y3
 
 
-def rotate(current_angle, degrees_to_rotate, direction):
-    result_angle = error = m1 = m2 = 0
-    KP = 5
-    # rotate to left
-    if direction == 1 :
-        result_angle = current_angle + degrees_to_rotate
-    # rotate to right 
-    elif direction == 2:
-        result_angle = current_angle - degrees_to_rotate
-    error = degrees_to_rotate
-    if direction == 1:
-        m1 = -error * KP    
-        m2 = error * KP
-    elif direction == 2:
-        m1 = error * KP
-        m2 = -error * KP
-    print('result angle: ', result_angle)
-    print('m1: ', m1,',','m2: ',m2)
-    print('error: ', error)
-    return result_angle, m1, m2
+def rotate(agent, current_angle, degrees_to_rotate, direction):
+    if mundo[agent]:
+        result_angle = error = m1 = m2 = 0
+        KP = 5
+        # rotate to left
+        if direction == 1 :
+            result_angle = current_angle + degrees_to_rotate
+        # rotate to right 
+        elif direction == 2:
+            result_angle = current_angle - degrees_to_rotate
+        error = degrees_to_rotate
+        if direction == 1:
+            m1 = -error * KP    
+            m2 = error * KP
+        elif direction == 2:
+            m1 = error * KP
+            m2 = -error * KP
+        print('result angle: ', result_angle)
+        print('m1: ', m1,',','m2: ',m2)
+        print('error: ', error)
+        return result_angle, m1, m2
 
+# verify if agents exist on viewport
+def detect_agent(follow_agent, followed_agent):
+    if mundo[follow_agent] and mundo[followed_agent]:
+        return True
+    else:
+        return False
+
+# distance between 2 points (it could be an specific point or a centroid of an agent)
+def get_distance(x1, x2, y1, y2):
+    distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+    print('distance:', distance)
+    return distance
 
 if __name__=='__main__':
     main()
