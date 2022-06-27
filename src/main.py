@@ -6,10 +6,15 @@ import data
 
 # global variables
 min_prev_x = min_prev_y = max_prev_x = max_prev_y = 0
-mundo = {'yellow':[],
+# world variables
+agent = {'yellow':[],
          'green':[],
-         'blue':[]
+         'blue':[] 
          }
+
+moving_objects = {}
+objects = {}
+marks = {}
 
 # window to viewport functions
 def new_x(valor, min_prev, max_prev):
@@ -101,11 +106,11 @@ def main():
                 # print('y: ',str(vy)) 
                 # generating masks for other colors
                 if not (generate_mask(frame, hsv_general, 'blue')):
-                    mundo['blue'] = []
+                    agent['blue'] = []
                 if not (generate_mask(frame, hsv_general, 'yellow')):
-                    mundo['yellow'] = []
+                    agent['yellow'] = []
                 if not (generate_mask(frame, hsv_general, 'green')):
-                    mundo['green'] = []
+                    agent['green'] = []
                 
                 # blue follows yellow just for testing
                 # detect_and_follow_agent(frame, 'blue', 'yellow')
@@ -186,11 +191,10 @@ def generate_mask(frame, hsv, color):
                     vy = min_angle[2]
                     direction = direction_angle(cx, cy, vx, vy)
                     cv2.putText(frame, str(id_agent), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
-                    global mundo
-                    mundo[color] = [id_agent, cx, cy, direction]
-                    # print(mundo)
-                    # test rotate function
-                    # if color == 'blue' and mundo['yellow']:
+                    global agent
+                    agent[color] = [id_agent, cx, cy, direction]
+                    # print(agent)
+                    # test rotate function 
                     #     # 1 is left and 2 is right
                     #     rotation = rotate(direction, 20, 2)
                     # convert position (cx cy) to viewport 
@@ -261,7 +265,7 @@ def get_angle(x1, y1, x2, y2, x3, y3):
 
 
 def rotate(agent, current_angle, degrees_to_rotate, direction):
-    if mundo[agent]:
+    if agent[agent]:
         result_angle = error = m1 = m2 = 0
         KP = 5
         # rotate to left
@@ -284,13 +288,13 @@ def rotate(agent, current_angle, degrees_to_rotate, direction):
 
 # verify if agents exist on viewport
 def detect_and_follow_agent(frame, follow_agent, followed_agent):
-    if mundo[follow_agent] and mundo[followed_agent]:
+    if agent[follow_agent] and agent[followed_agent]:
         # point where I wish to go
-        cv2.line(frame, (mundo[follow_agent][1], mundo[follow_agent][2]), (mundo[followed_agent][1], mundo[followed_agent][2]), (255,0,0), 2)
-        temp = direction_angle(mundo[follow_agent][1], mundo[follow_agent][2], mundo[followed_agent][1], mundo[followed_agent][2])
-        angle_to_point = temp - mundo[follow_agent][3]
+        cv2.line(frame, (agent[follow_agent][1], agent[follow_agent][2]), (agent[followed_agent][1], agent[followed_agent][2]), (255,0,0), 2)
+        temp = direction_angle(agent[follow_agent][1], agent[follow_agent][2], agent[followed_agent][1], agent[followed_agent][2])
+        angle_to_point = temp - agent[follow_agent][3]
         print('angle to point ', angle_to_point)
-        cv2.putText(frame,str(angle_to_point), (mundo[followed_agent][1], mundo[followed_agent][2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255,255,255))
+        cv2.putText(frame,str(angle_to_point), (agent[followed_agent][1], agent[followed_agent][2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255,255,255))
     else:
         return False
 
