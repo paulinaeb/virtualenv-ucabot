@@ -106,6 +106,10 @@ def main():
                     mundo['yellow'] = []
                 if not (generate_mask(frame, hsv_general, 'green')):
                     mundo['green'] = []
+                
+                # blue follows yellow just for testing
+                # detect_and_follow_agent(frame, 'blue', 'yellow')
+                    
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
             
@@ -160,6 +164,7 @@ def generate_mask(frame, hsv, color):
                     if(i % 2 == 0):
                         x = n[i]
                         y = n[i + 1] 
+                        # this verifies that every vertex is in the region of the viewport
                         if (max_prev_x > x > min_prev_x) and (min_prev_y > y > max_prev_y):
                             flag = flag + 1 
                         # String containing the co-ordinates.
@@ -188,18 +193,9 @@ def generate_mask(frame, hsv, color):
                     # if color == 'blue' and mundo['yellow']:
                     #     # 1 is left and 2 is right
                     #     rotation = rotate(direction, 20, 2)
-                    #     # point where I wish to go
-                    #     px = mundo['yellow'][1] 
-                    #     py = mundo['yellow'][2] 
-                    #     cv2.circle(frame, (px, py), 2, (255,255,255), 2)
-                    #     temp = direction_angle(cx, cy, px, py)
-                    #     angle_to_point = temp - direction
-                    #     print('angle to point ', angle_to_point)
-                    #     cv2.putText(frame,str(angle_to_point), (px, py), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0))
-                    # # convert position (cx cy) to viewport 
-                    # cx = new_x(cx, min_prev_x, max_prev_x) 
-                    # cy = new_y(cy, min_prev_y, max_prev_y) 
-                    
+                    # convert position (cx cy) to viewport 
+                    cx = new_x(cx, min_prev_x, max_prev_x) 
+                    cy = new_y(cy, min_prev_y, max_prev_y) 
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     return True
     return
@@ -287,9 +283,14 @@ def rotate(agent, current_angle, degrees_to_rotate, direction):
         return result_angle, m1, m2
 
 # verify if agents exist on viewport
-def detect_agent(follow_agent, followed_agent):
+def detect_and_follow_agent(frame, follow_agent, followed_agent):
     if mundo[follow_agent] and mundo[followed_agent]:
-        return True
+        # point where I wish to go
+        cv2.line(frame, (mundo[follow_agent][1], mundo[follow_agent][2]), (mundo[followed_agent][1], mundo[followed_agent][2]), (255,0,0), 2)
+        temp = direction_angle(mundo[follow_agent][1], mundo[follow_agent][2], mundo[followed_agent][1], mundo[followed_agent][2])
+        angle_to_point = temp - mundo[follow_agent][3]
+        print('angle to point ', angle_to_point)
+        cv2.putText(frame,str(angle_to_point), (mundo[followed_agent][1], mundo[followed_agent][2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255,255,255))
     else:
         return False
 
