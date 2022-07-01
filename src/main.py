@@ -3,6 +3,7 @@ import cv2
 import numpy as np 
 import math
 import data
+from screeninfo import get_monitors
 
 # global variables
 min_prev_x = min_prev_y = max_prev_x = max_prev_y = 0
@@ -15,6 +16,11 @@ agent = {'yellow':[],
 moving_objects = {}
 objects = {}
 marks = {}
+
+display ={
+    'display1':[],
+    'display2':[]
+}
 
 # window to viewport functions
 def new_x(valor, min_prev, max_prev):
@@ -39,12 +45,19 @@ def vp_2_w_y(value, min_prev, max_prev):
 # remember to activate virtual environment before running this
 def main():
     sg.theme('Black')
+    for m in get_monitors():
+        if m.is_primary is True: 
+            display['display1'] = [str(m.name), (m.x), (m.y), (m.width), (m.height)]
+        elif m.is_primary is False: 
+            display['display2'] = [str(m.name), (m.x), (m.y), (m.width), (m.height)]
+
     # define the window layout
     layout = [[sg.Text('Virtual Environment', size=(40, 1), justification='center', font='Helvetica 20')],
               [sg.Image(filename='', key='image')],
               [sg.Button('Start', size=(10, 1), font='Helvetica 14'),
                sg.Button('Stop', size=(10, 1),  font='Any 14'),
                sg.Button('Exit', size=(10, 1),  font='Helvetica 14'),]]
+
 
     # create the window and show it without the plot
     window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 150))
@@ -53,7 +66,8 @@ def main():
     recording = False
     # Event loop Read and display frames, operate the GUI 
     while True:
-        event, values = window.read(timeout=20)
+        event, values = window.read(timeout=20) 
+        
         if event == 'Exit' or event == sg.WIN_CLOSED:
             if recording:
                 cap.release()
@@ -61,6 +75,9 @@ def main():
 
         elif event == 'Start':
             recording = True
+            if display['display2']:
+                layout2 = [[sg.Image(filename='../img/fondo.png', key='img', size=(display['display2'][3]-30,500))]] 
+                py = sg.Window('projection', layout2, element_justification='c', location=(display['display2'][1],0), finalize=True) 
 
         elif event == 'Stop' and recording == True:
             recording = False
@@ -70,7 +87,7 @@ def main():
             window['image'].update(data=imgbytes)
             # closes the camera
             cap.release()
-
+        
         if recording:
             frame = 0
             _, frame = cap.read()
@@ -111,12 +128,11 @@ def main():
                     agent['yellow'] = []
                 if not (generate_mask(frame, hsv_general, 'green')):
                     agent['green'] = []
-                
                 # blue follows yellow just for testing
                 # detect_and_follow_agent(frame, 'blue', 'yellow')
-                    
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
+
             
 # function to generate each mask and draw contours and name of shapes given the color
 def generate_mask(frame, hsv, color):
