@@ -10,6 +10,8 @@ from PIL import Image
 
 # global variables
 min_prev_x = min_prev_y = max_prev_x = max_prev_y = 0
+
+min_pj_x = min_pj_y = max_pj_x = max_pj_y = 0
 # world variables
 agent = {'yellow':[],
          'green':[],
@@ -22,25 +24,52 @@ marks = {}
 
 display = [] 
 
+draw = 0
+
+class VP:
+    def __init__(self, vp_min, vp_max):
+        self.vp_min = vp_min
+        self.vp_max = vp_max        
+        self.vp_du = vp_max.u - vp_min.u
+        self.vp_dv = vp_max.v - vp_min.v
+
+
+class Window:
+    def __init__(self, w_min, w_max):
+        self.w_min = w_min
+        self.w_max = w_max
+        self.w_dx = w_max.x - w_min.x
+        self.w_dy = w_max.y - w_min.y
+
+
+def w2vp(x, y, w, vp):
+    v = vp.dv / w.dx * (x - w.xmin) + vp.vmin
+    pass
+
 # window to viewport functions
 def new_x(valor, min_prev, max_prev):
-    value = (((valor - min_prev) * (data.NEW_MAX - data.NEW_MIN)) / (max_prev - min_prev)) + data.NEW_MIN
-    return int(value)
+    value = (((valor - min_prev) * (data.NEW_MAX_X - data.NEW_MIN_X)) / (max_prev - min_prev)) + data.NEW_MIN_X
+    return round(value)
 
 
 def new_y(valor, min_prev, max_prev):
-    value = (((min_prev - valor) * (data.NEW_MAX - data.NEW_MIN)) / (min_prev - max_prev)) + data.NEW_MIN
-    return int(value)
+    value = (((min_prev - valor) * (data.NEW_MAX_Y - data.NEW_MIN_Y)) / (min_prev - max_prev)) + data.NEW_MIN_Y
+    return round(value)
 
 # viewport to window functions
 def vp_2_w_x(value, min_prev, max_prev):
-    new_value = (((value - data.NEW_MIN) * (max_prev - min_prev)) / (data.NEW_MAX - data.NEW_MIN)) + min_prev
-    return int(new_value)
+    new_value = (((value - data.NEW_MIN_X) * (max_prev - min_prev)) / (data.NEW_MAX_X - data.NEW_MIN_X)) + min_prev
+    return round(new_value)
 
 
 def vp_2_w_y(value, min_prev, max_prev):
-    new_value = (((data.NEW_MIN - value) * (min_prev - max_prev)) / (data.NEW_MAX - data.NEW_MIN)) + min_prev
-    return int(new_value)
+    new_value = (((data.NEW_MIN_Y - value) * (min_prev - max_prev)) / (data.NEW_MAX_Y - data.NEW_MIN_Y)) + min_prev
+    return round(new_value)
+
+
+def vpv_2_w_y(value, min_prev, max_prev):
+    new_value = (((value - data.NEW_MIN_Y) * (max_prev - min_prev)) / (data.NEW_MAX_Y - data.NEW_MIN_Y)) + min_prev
+    return round(new_value)
 
 
 def image_to_data(im): 
@@ -48,6 +77,7 @@ def image_to_data(im):
         im.save(output, format="PNG")
         data = output.getvalue()
     return data
+
 
 # remember to activate virtual environment before running this
 def main():
@@ -84,21 +114,33 @@ def main():
                     display = [(m.x), (m.y), (m.width), (m.height)]
                 elif m.is_primary is True: 
                     display = [(m.x), (m.y), (m.width), (m.height)]
+                    
+            # global min and max x and y of projection
+            global min_pj_x 
+            min_pj_x = 0
+            global min_pj_y
+            min_pj_y = 25
+            global max_pj_x
+            max_pj_x = display[2]-25
+            global max_pj_y
+            max_pj_y = display[3]
+            # draw marks and define rectangle as background
             im_mark = Image.open('../img/equis.png')
             im_mark_new = im_mark.resize((25,25))
-            layout = [[sg.Graph(((display[2], display[3])), (0, 0), (display[2], display[3]), enable_events=True, key='-GRAPH-', pad=(0,0))]]
-            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(display[2], display[3]), margins=(0,0)).Finalize()
+            layout = [[sg.Graph(((display[2], max_pj_y)), (0, 0), (display[2], max_pj_y), enable_events=True, key='-GRAPH-', pad=(0,0))]]
+            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(display[2], max_pj_y), margins=(0,0)).Finalize()
             virtual_window.Maximize()
+            global draw
             draw = virtual_window['-GRAPH-']
-            back = draw.draw_rectangle((0, display[3]), (display[2], 0), fill_color='black')
+            back = draw.draw_rectangle((0, max_pj_y), (display[2], 0), fill_color='black')
             # 25 is the error margin for the window
-            ids = [draw.draw_image('../img/eggs.png', location=(randint(0, display[2]-25), randint(0, display[3]-25)))]
-            mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(0, 25))]
-            mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(display[2]-25, display[3]))]
-            dog = [draw.draw_circle((75, 75), 25, fill_color='white', line_color='white')]
+            # ids = [draw.draw_image('../img/eggs.png', location=(randint(0, display[2]-25), randint(0, display[3]-25)))]
+            
+            mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(min_pj_x, min_pj_y))]
+            mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(max_pj_x, max_pj_y))]
+            # dog = [draw.draw_circle((75, 75), 25, fill_color='white', line_color='white')]
             # print('minx, miny, maxx, maxy display', display)
 
-                
         elif event == 'Stop' and recording == True:
             recording = False
             img = np.full((480, 640), 255)
@@ -139,13 +181,13 @@ def main():
                 max_x = new_x(region[1][0], min_prev_x, max_prev_x) 
                 min_y = new_y(region[0][1], min_prev_y, max_prev_y)
                 max_y = new_y(region[1][1], min_prev_y, max_prev_y)
+                # print (region)
                 cv2.putText(frame, (str(min_x)+','+str(min_y)), (int(min_prev_x), int(min_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                 cv2.putText(frame, (str(max_x)+','+str(max_y)), (int(max_prev_x), int(max_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                 # test vp to w function
-                # vx = vp_2_w_x(50, min_prev_x, max_prev_x)
-                # print('x: ',str(vx))
-                # vy = vp_2_w_y(50, min_prev_y, max_prev_y)
-                # print('y: ',str(vy)) 
+                vx = vp_2_w_x(65, min_prev_x, max_prev_x) 
+                vy = vp_2_w_y(50, min_prev_y, max_prev_y) 
+                cv2.circle(frame, (vx, vy), 10, (255,0,255), 2)
                 # generating masks for other colors
                 if not (generate_mask(frame, hsv_general, 'blue')):
                     agent['blue'] = []
@@ -155,6 +197,11 @@ def main():
                     agent['green'] = []
                 # blue follows yellow just for testing
                 # detect_and_follow_agent(frame, 'blue', 'yellow')
+                # window to vp dog
+                x_dog = vp_2_w_x(65, min_pj_x, max_pj_x)
+                y_dog = vpv_2_w_y(50, min_pj_y, max_pj_y) 
+                dog = [draw.draw_circle((x_dog, y_dog), 20, fill_color='white', line_color='white')]
+                # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
     virtual_window.close()

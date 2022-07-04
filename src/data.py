@@ -8,5 +8,7 @@ HSV_COLORS = {
 }
 
 # viewport new values
-NEW_MIN = 0
-NEW_MAX = 100
+NEW_MIN_X = 0
+NEW_MIN_Y = 0
+NEW_MAX_Y = 100
+NEW_MAX_X = 130
