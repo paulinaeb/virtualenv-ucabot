@@ -4,6 +4,9 @@ import numpy as np
 import math
 import data
 from screeninfo import get_monitors
+from io import BytesIO
+from random import randint
+from PIL import Image
 
 # global variables
 min_prev_x = min_prev_y = max_prev_x = max_prev_y = 0
@@ -17,10 +20,7 @@ moving_objects = {}
 objects = {}
 marks = {}
 
-display ={
-    'display1':[],
-    'display2':[]
-}
+display = [] 
 
 # window to viewport functions
 def new_x(valor, min_prev, max_prev):
@@ -42,21 +42,23 @@ def vp_2_w_y(value, min_prev, max_prev):
     new_value = (((data.NEW_MIN - value) * (min_prev - max_prev)) / (data.NEW_MAX - data.NEW_MIN)) + min_prev
     return int(new_value)
 
+
+def image_to_data(im): 
+    with BytesIO() as output:
+        im.save(output, format="PNG")
+        data = output.getvalue()
+    return data
+
 # remember to activate virtual environment before running this
 def main():
     sg.theme('Black')
-    for m in get_monitors():
-        if m.is_primary is True: 
-            display['display1'] = [str(m.name), (m.x), (m.y), (m.width), (m.height)]
-        elif m.is_primary is False: 
-            display['display2'] = [str(m.name), (m.x), (m.y), (m.width), (m.height)]
 
     # define the window layout
     layout = [[sg.Text('Virtual Environment', size=(40, 1), justification='center', font='Helvetica 20')],
               [sg.Image(filename='', key='image')],
               [sg.Button('Start', size=(10, 1), font='Helvetica 14'),
                sg.Button('Stop', size=(10, 1),  font='Any 14'),
-               sg.Button('Exit', size=(10, 1),  font='Helvetica 14'),]]
+               sg.Button('Exit', size=(10, 1),  font='Helvetica 14')]]
 
 
     # create the window and show it without the plot
@@ -75,10 +77,28 @@ def main():
 
         elif event == 'Start':
             recording = True
-            if display['display2']:
-                layout2 = [[sg.Image(filename='../img/fondo.png', key='img', size=(display['display2'][3]-30,500))]] 
-                py = sg.Window('projection', layout2, element_justification='c', location=(display['display2'][1],0), finalize=True) 
+            # generate projection
+            for m in get_monitors():
+                global display
+                if m.is_primary is False: 
+                    display = [(m.x), (m.y), (m.width), (m.height)]
+                elif m.is_primary is True: 
+                    display = [(m.x), (m.y), (m.width), (m.height)]
+            im_mark = Image.open('../img/equis.png')
+            im_mark_new = im_mark.resize((25,25))
+            layout = [[sg.Graph(((display[2], display[3])), (0, 0), (display[2], display[3]), enable_events=True, key='-GRAPH-', pad=(0,0))]]
+            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(display[2], display[3]), margins=(0,0)).Finalize()
+            virtual_window.Maximize()
+            draw = virtual_window['-GRAPH-']
+            back = draw.draw_rectangle((0, display[3]), (display[2], 0), fill_color='black')
+            # 25 is the error margin for the window
+            ids = [draw.draw_image('../img/eggs.png', location=(randint(0, display[2]-25), randint(0, display[3]-25)))]
+            mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(0, 25))]
+            mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(display[2]-25, display[3]))]
+            dog = [draw.draw_circle((75, 75), 25, fill_color='white', line_color='white')]
+            # print('minx, miny, maxx, maxy display', display)
 
+                
         elif event == 'Stop' and recording == True:
             recording = False
             img = np.full((480, 640), 255)
@@ -88,15 +108,20 @@ def main():
             # closes the camera
             cap.release()
         
-        if recording:
-            frame = 0
+        if recording: 
             _, frame = cap.read()
+            # event2, values2 = virtual_window.read() 
+            
+            # if event2 in (sg.WINDOW_CLOSED, 'Exit'):
+            #     break
             # converting image obtained to hsv, if exists
             if frame is None:
                 print('Something went wrong trying to connect to your camera. Please verify.')
                 return
             else:
                 hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            
+  
             # generate mask to define region of interest (viewport)
             region = generate_mask(frame, hsv_general, 'black')
             # if two black marks exist 
@@ -132,6 +157,7 @@ def main():
                 # detect_and_follow_agent(frame, 'blue', 'yellow')
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
+    virtual_window.close()
 
             
 # function to generate each mask and draw contours and name of shapes given the color
