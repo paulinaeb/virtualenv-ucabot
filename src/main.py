@@ -8,30 +8,40 @@ from io import BytesIO
 from random import randint
 from PIL import Image
 
-# global variables
-min_prev_x = min_prev_y = max_prev_x = max_prev_y = 0
-
-min_pj_x = min_pj_y = max_pj_x = max_pj_y = 0
 # world variables
 agent = {'yellow':[],
          'green':[],
          'blue':[] 
          }
 
-moving_objects = {}
-objects = {}
-marks = {}
-
 display = [] 
 
 draw = 0
 
-class VP:
-    def __init__(self, vp_min, vp_max):
-        self.vp_min = vp_min
-        self.vp_max = vp_max        
-        self.vp_du = vp_max.u - vp_min.u
-        self.vp_dv = vp_max.v - vp_min.v
+# viewport for projector
+vpv = []
+
+# viewport for camera
+vpc = []
+
+class ViewPort:
+    def __init__(self, name, u_min, v_min, u_max, v_max):
+        self.name = name
+        self.u_min = u_min
+        self.u_max = u_max     
+        self.v_min = v_min
+        self.v_max = v_max
+        self.du = u_max - u_min
+        if name == 'camera':
+            self.dv = v_min - v_max
+        else:
+            self.dv = v_max - v_min     
+    
+    
+def w2vp(x, y, VP):
+    value_x = ((x - VP.u_min) * (data.NEW_MAX_X - data.NEW_MIN_X) / VP.du) + data.NEW_MIN_X
+    value_y = ((VP.v_min - y) * (data.NEW_MAX_Y - data.NEW_MIN_Y) / VP.dv) + data.NEW_MIN_Y
+    return round(value_x), round(value_y)
 
 
 class Window:
@@ -41,20 +51,6 @@ class Window:
         self.w_dx = w_max.x - w_min.x
         self.w_dy = w_max.y - w_min.y
 
-
-def w2vp(x, y, w, vp):
-    v = vp.dv / w.dx * (x - w.xmin) + vp.vmin
-    pass
-
-# window to viewport functions
-def new_x(valor, min_prev, max_prev):
-    value = (((valor - min_prev) * (data.NEW_MAX_X - data.NEW_MIN_X)) / (max_prev - min_prev)) + data.NEW_MIN_X
-    return round(value)
-
-
-def new_y(valor, min_prev, max_prev):
-    value = (((min_prev - valor) * (data.NEW_MAX_Y - data.NEW_MIN_Y)) / (min_prev - max_prev)) + data.NEW_MIN_Y
-    return round(value)
 
 # viewport to window functions
 def vp_2_w_x(value, min_prev, max_prev):
@@ -94,7 +90,7 @@ def main():
     # create the window and show it without the plot
     window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 150))
     #indicates which camera use
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     recording = False
     # Event loop Read and display frames, operate the GUI 
     while True:
@@ -114,32 +110,24 @@ def main():
                     display = [(m.x), (m.y), (m.width), (m.height)]
                 elif m.is_primary is True: 
                     display = [(m.x), (m.y), (m.width), (m.height)]
-                    
-            # global min and max x and y of projection
-            global min_pj_x 
-            min_pj_x = 0
-            global min_pj_y
-            min_pj_y = 25
-            global max_pj_x
-            max_pj_x = display[2]-25
-            global max_pj_y
-            max_pj_y = display[3]
+                     
+            # create viewport for video beam projection
+            global vpv
+            # 25 is the error margin for the window
+            vpv = ViewPort('video', 0, 25, display[2]-25, display[3])
+            
             # draw marks and define rectangle as background
             im_mark = Image.open('../img/equis.png')
             im_mark_new = im_mark.resize((25,25))
-            layout = [[sg.Graph(((display[2], max_pj_y)), (0, 0), (display[2], max_pj_y), enable_events=True, key='-GRAPH-', pad=(0,0))]]
-            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(display[2], max_pj_y), margins=(0,0)).Finalize()
+            layout = [[sg.Graph(((vpv.u_max + 25, vpv.v_max)), (0, 0), (vpv.u_max + 25, vpv.v_max), enable_events=True, key='-GRAPH-', pad=(0,0))]]
+            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(vpv.u_max + 25, vpv.v_max), margins=(0,0)).Finalize()
             virtual_window.Maximize()
             global draw
             draw = virtual_window['-GRAPH-']
-            back = draw.draw_rectangle((0, max_pj_y), (display[2], 0), fill_color='black')
-            # 25 is the error margin for the window
+            back = draw.draw_rectangle((0, vpv.v_max), (vpv.u_max + 25, 0), fill_color='black')
             # ids = [draw.draw_image('../img/eggs.png', location=(randint(0, display[2]-25), randint(0, display[3]-25)))]
-            
-            mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(min_pj_x, min_pj_y))]
-            mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(max_pj_x, max_pj_y))]
-            # dog = [draw.draw_circle((75, 75), 25, fill_color='white', line_color='white')]
-            # print('minx, miny, maxx, maxy display', display)
+            mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(vpv.u_min, vpv.v_min))]
+            mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(vpv.u_max, vpv.v_max))]  
 
         elif event == 'Stop' and recording == True:
             recording = False
@@ -153,7 +141,6 @@ def main():
         if recording: 
             _, frame = cap.read()
             # event2, values2 = virtual_window.read() 
-            
             # if event2 in (sg.WINDOW_CLOSED, 'Exit'):
             #     break
             # converting image obtained to hsv, if exists
@@ -163,30 +150,22 @@ def main():
             else:
                 hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
             
-  
             # generate mask to define region of interest (viewport)
             region = generate_mask(frame, hsv_general, 'black')
             # if two black marks exist 
-            if region:   
-                global min_prev_x
-                min_prev_x = region[0][0]
-                global min_prev_y
-                min_prev_y = region[0][1]
-                global max_prev_x
-                max_prev_x = region[1][0]
-                global max_prev_y
-                max_prev_y = region[1][1] 
-                # calculates and shows origin and max limit of viewport
-                min_x = new_x(region[0][0], min_prev_x, max_prev_x) 
-                max_x = new_x(region[1][0], min_prev_x, max_prev_x) 
-                min_y = new_y(region[0][1], min_prev_y, max_prev_y)
-                max_y = new_y(region[1][1], min_prev_y, max_prev_y)
+            if region:    
+                # calculates and shows origin and max limit of viewport 
+                global vpc
+                vpc = ViewPort('camera', region[0][0], region[0][1], region[1][0], region[1][1])
+                vpc_min = (w2vp(region[0][0], region[0][1], vpc))
+                vpc_max = (w2vp(region[1][0], region[1][1], vpc))  
                 # print (region)
-                cv2.putText(frame, (str(min_x)+','+str(min_y)), (int(min_prev_x), int(min_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                cv2.putText(frame, (str(max_x)+','+str(max_y)), (int(max_prev_x), int(max_prev_y)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min, vpc.v_min), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max, vpc.v_max), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                 # test vp to w function
-                vx = vp_2_w_x(65, min_prev_x, max_prev_x) 
-                vy = vp_2_w_y(50, min_prev_y, max_prev_y) 
+                vx = vp_2_w_x(65, vpc.u_min, vpc.u_max) 
+                vy = vp_2_w_y(50, vpc.v_min, vpc.v_max) 
+                # print('vx, vy ', vx,' ',vy)
                 cv2.circle(frame, (vx, vy), 10, (255,0,255), 2)
                 # generating masks for other colors
                 if not (generate_mask(frame, hsv_general, 'blue')):
@@ -198,8 +177,8 @@ def main():
                 # blue follows yellow just for testing
                 # detect_and_follow_agent(frame, 'blue', 'yellow')
                 # window to vp dog
-                x_dog = vp_2_w_x(65, min_pj_x, max_pj_x)
-                y_dog = vpv_2_w_y(50, min_pj_y, max_pj_y) 
+                x_dog = vp_2_w_x(65, vpv.u_min, vpv.u_max)
+                y_dog = vpv_2_w_y(50, vpv.v_min, vpv.v_max) 
                 dog = [draw.draw_circle((x_dog, y_dog), 20, fill_color='white', line_color='white')]
                 # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
@@ -259,7 +238,8 @@ def generate_mask(frame, hsv, color):
                         x = n[i]
                         y = n[i + 1] 
                         # this verifies that every vertex is in the region of the viewport
-                        if (max_prev_x > x > min_prev_x) and (min_prev_y > y > max_prev_y):
+                        # print(vpc.u_min)
+                        if (vpc.u_max > x > vpc.u_min) and (vpc.v_min > y > vpc.v_max):
                             flag = flag + 1 
                         # String containing the co-ordinates.
                         # string = str(x) + " " + str(y) 
@@ -287,8 +267,7 @@ def generate_mask(frame, hsv, color):
                     #     # 1 is left and 2 is right
                     #     rotation = rotate(direction, 20, 2)
                     # convert position (cx cy) to viewport 
-                    cx = new_x(cx, min_prev_x, max_prev_x) 
-                    cy = new_y(cy, min_prev_y, max_prev_y) 
+                    cx, cy = w2vp(cx, cy, vpc) 
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     return True
     return
