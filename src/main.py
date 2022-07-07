@@ -118,10 +118,7 @@ def main():
            
             # draw marks and define rectangle as background
             im_mark = Image.open('../img/equis.png')
-            im_mark_new = im_mark.resize((25,25))
-            # im_back = Image.open('../img/fondo2.png')
-            # im_back_new = im_back.resize((vpv.u_max + 25, vpv.v_max))
-            # img = cv2.imread('../img/fondo2.png')
+            im_mark_new = im_mark.resize((25,25)) 
             layout = [[sg.Graph(((vpv.u_max + 25, vpv.v_max)), (0, 0), (vpv.u_max + 25, vpv.v_max), enable_events=True, key='-GRAPH-', pad=(0,0))]]
             virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(vpv.u_max + 25, vpv.v_max), margins=(0,0)).Finalize()
             virtual_window.Maximize()
@@ -129,8 +126,6 @@ def main():
             draw = virtual_window['-GRAPH-']
             global back
             back = draw.draw_rectangle((0, vpv.v_max), (vpv.u_max + 25, 0), fill_color='black')
-            
-            # back = [draw.draw_image(data=image_to_data(im_mark_new), location=(0, vpv.v_max))]
             # ids = [draw.draw_image('../img/eggs.png', location=(randint(0, display[2]-25), randint(0, display[3]-25)))]
             mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(vpv.u_min, vpv.v_min))]
             mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(vpv.u_max, vpv.v_max))]  
@@ -251,28 +246,39 @@ def generate_mask(frame, hsv, color):
                     i = i + 1
                 if flag == 3 :
                     id_agent = get_id(color)
+                    
+                    new_agent = Agent(color)
+                    
                     cv2.drawContours(frame, [approx],0, (0), 2)
                     # computes the centroid of shapes
                     M = cv2.moments(count)
                     cx = int(M['m10'] / M['m00'])
                     cy = int(M['m01'] / M['m00']) 
-                    # get min angle and their coordinates - min_angle - vx - vy
-                    min_angle = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
-                    vx = min_angle[1]
-                    vy = min_angle[2]
-                    direction = direction_angle(cx, cy, vx, vy)
-                    cv2.putText(frame, str(id_agent), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     
-                    # x2 = x1 + length * cos(θ)
-                    # y2 = y1 + length * sin(θ) 
-                    px = int(vx - 30 * math.cos(direction * 3.14 / 180))
-                    py = int(vy - 30 * math.sin(direction * 3.14 / 180))
-                    cv2.line(frame, (vx, vy), (px, py), (255,0,255), 4)
+                    new_agent.set_centroid(cx, cy)
+                    
+                    # get min angle and their coordinates - min_angle - vx - vy
+                    min_angle, vx, vy = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
+
+                    direction = direction_angle(cx, cy, vx, vy)
+                    
+                    new_agent.set_direction(direction)
+                    
+                    cv2.putText(frame, str(id_agent), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    # distance between centroid and min angle vertex 
+                    # px, py = w2vp(100, 0, vpc)
+                    # homogeneous_coord(cx, cy, direction, frame, px, py)
+                    # print('cx', cx, 'cy', cy)
+                    print('cx', cx, 'cy', cy)
+                    # homogeneous_coord(cx, cy, direction, frame, 100, 0)
+                    print(distance(new_agent, vx, vy))
                     global agent
                     agent[color] = [id_agent, cx, cy, direction] 
                     # convert position (cx cy) to viewport 
                     cx, cy = w2vp(cx, cy, vpc) 
-                    cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (min_angle[1], min_angle[2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    homogeneous_coord(cx, cy, direction, frame, 20, 0)
+                    print('cx', cx, 'cy', cy)
+                    cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     return True
     return
 
@@ -375,6 +381,54 @@ def get_distance(x1, x2, y1, y2):
     distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
     print('distance:', distance)
     return distance
+
+# distance from centroid to min angle vertex
+def distance(agent, vx, vy):
+    value = math.sqrt((agent.cx - vx)**2 + (agent.cy - vy)**2)
+    return value
+
+
+def homogeneous_coord(cx, cy, alpha, frame, px, py):
+    gamma =  alpha * np.pi / 180
+    print ('gamma', gamma)
+    # rotation
+    R = np.array([[np.cos(gamma), - np.sin(gamma)],
+                [np.sin(gamma), np.cos(gamma)],
+                [0, 0]]) 
+    # row = np.array([[0,0]])
+    # R = np.concatenate((R, row), axis = 0)
+    column = np.array([[0], [0], [1]])
+    # final rotation
+    R = np.concatenate((R, column), axis = 1) 
+    # translation
+    P = np.array([[cx], [cy], [1]]) 
+    T = np.array([[1, 0], [0, 1], [0,0]])
+    T = np.concatenate((T, P), axis = 1) 
+    MT = T.dot(R) 
+    P1 = np.array([[px], [py], [1]]) 
+    P1P = MT.dot(P1)
+    
+    P2 = np.array([[-1*px], [py], [1]])
+    print('2', P2)
+    P2P = MT.dot(P2)
+    # transform vp2w
+    P1P_vpc_x, P1P_vpc_y = vp2w(int(P1P[0]), int(P1P[1]), vpc)
+    P2P_vpc_x, P2P_vpc_y = vp2w(int(P2P[0]), int(P2P[1]), vpc)
+    
+    
+    P1P_vpv_x, P1P_vpv_y = vp2w(int(P1P[0]), int(P1P[1]), vpv)
+    P2P_vpv_x, P2P_vpv_y = vp2w(int(P2P[0]), int(P2P[1]), vpv) 
+    
+    print('x,y 1', P1P_vpv_x,' ', P1P_vpv_y)
+    print('x,y 2', P2P_vpv_x,',',P2P_vpv_y)
+    
+    line = [draw.draw_line((P1P_vpv_x, P1P_vpv_y), (P2P_vpv_x, P2P_vpv_y), color='white')] 
+    
+    cv2.line(frame, (P1P_vpc_x, P1P_vpc_y), (P2P_vpc_x, P2P_vpc_y), (255,0, 255), 3)
+
+    return 
+
+# print(homogeneous_coord(50, 0))
 
 if __name__=='__main__':
     main()
