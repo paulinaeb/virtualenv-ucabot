@@ -9,9 +9,9 @@ from random import randint
 from PIL import Image
 
 # world variables
-agent = {'yellow':[],
-         'green':[],
-         'blue':[] 
+agent = {'yellow': None,
+         'green': None,
+         'blue': None 
          }
 
 display = [] 
@@ -34,14 +34,20 @@ class ViewPort:
     
 
 class Agent:
-    def __init__(self, color):
-        self.color = color
+    def __init__(self, color): 
         self.id = get_id(color)
     def set_centroid(self, cx, cy):
         self.cx = cx
         self.cy = cy
     def set_direction(self, direction):
         self.direction = direction
+    def set_line(self, line1, line2):
+        self.line1 = line1
+        self.line2 = line2
+    def set_limit(self, limit):
+        self.limit = limit
+    def set_out(self):
+        self.cx = self.cy = self.direction = self.line2 = self.line1 = None    
             
 # viewport for projector
 vpv = ViewPort('video')
@@ -72,7 +78,6 @@ def image_to_data(im):
         im.save(output, format="PNG")
         data = output.getvalue()
     return data
-
 
 # it's needed to activate virtual environment before running this
 def main():
@@ -134,11 +139,10 @@ def main():
             
             mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
             mark2_centroid = [draw.draw_circle((x_vb - 5, y_vb - 5), 5, fill_color='yellow')]
-            
+             
         elif event == 'Stop' and recording == True:
             recording = False
-            img = np.full((480, 640), 255)
-            # this is faster, shorter and needs less includes
+            img = np.full((480, 640), 255) 
             imgbytes = cv2.imencode('.png', img)[1].tobytes()
             window['image'].update(data=imgbytes)
             # closes the camera
@@ -165,19 +169,27 @@ def main():
                 cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min, vpc.v_min), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                 cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max, vpc.v_max), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                 # generating masks for other colors
-                if not (generate_mask(frame, hsv_general, 'blue')):
-                    agent['blue'] = []
-                if not (generate_mask(frame, hsv_general, 'yellow')):
-                    agent['yellow'] = []
-                if not (generate_mask(frame, hsv_general, 'green')):
-                    agent['green'] = []
+                if (not generate_mask(frame, hsv_general, 'blue')) and (agent['blue'] is not None):
+                    draw.delete_figure(agent['blue'].line1)
+                    draw.delete_figure(agent['blue'].line2)
+                    draw.delete_figure(agent['blue'].limit)
+                    agent['blue'].set_out() 
+                if (not generate_mask(frame, hsv_general, 'yellow')) and (agent['yellow'] is not None):
+                    draw.delete_figure(agent['yellow'].line1)
+                    draw.delete_figure(agent['yellow'].line2)
+                    draw.delete_figure(agent['yellow'].limit)
+                    agent['yellow'].set_out()
+                if (not generate_mask(frame, hsv_general, 'green') and (agent['green'] is not None)):
+                    draw.delete_figure(agent['green'].line1)
+                    draw.delete_figure(agent['green'].line2)
+                    draw.delete_figure(agent['green'].limit)
+                    agent['green'].set_out()
                 # blue follows yellow just for testing
                 # detect_and_follow_agent(frame, 'blue', 'yellow') 
                  
                 # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
-    virtual_window.close()
 
             
 # function to generate each mask and draw contours and name of shapes given the color
@@ -195,7 +207,7 @@ def generate_mask(frame, hsv, color):
         approx = cv2.approxPolyDP(count, epsilon, True)
         # get area to work with only visible objects
         area = cv2.contourArea(count)
-        if area > 500:
+        if area > 10:
             # recognize triangles or rectangles 
             if len(approx) == 4 and color == 'black': 
                 # computes the centroid of shapes
@@ -240,45 +252,39 @@ def generate_mask(frame, hsv, color):
                         x_point.append(x)
                         y_point.append(y)
                     i = i + 1
-                if flag == 3 :
-                    id_agent = get_id(color)
-                    
-                    new_agent = Agent(color)
-                    
+                if flag == 3 : 
                     cv2.drawContours(frame, [approx],0, (0), 2)
                     # computes the centroid of shapes
                     M = cv2.moments(count)
                     cx = int(M['m10'] / M['m00'])
                     cy = int(M['m01'] / M['m00']) 
-                    
+                    new_agent = Agent(color)
                     new_agent.set_centroid(cx, cy)
-                    
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle, vx, vy = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
                     # get direction of min angle (vertex) represents agent's direction
                     direction = direction_angle(cx, cy, vx, vy)
-                    
                     new_agent.set_direction(direction)
-                    
-                    cv2.putText(frame, str(id_agent), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    cv2.putText(frame, str(new_agent.id), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     # distance between centroid and min angle vertex  
                     length = distance(new_agent, vx, vy) 
+                    new_agent.set_limit(draw_treshold(frame, length, new_agent))
                     length, aux = w2vp(length, 0, vpc)
                     length = -1 * length
-                    p1 = length + length / 8
+                    p1 = length + length / 25
                     p2 = p1 + length
                     p3 = -1 * p1
                     p4 = -1 * p2
                     # create agent in the world
                     global agent
-                    agent[color] = [id_agent, cx, cy, direction] 
+                    # agent[color] = [id_agent, cx, cy, direction] 
                     # convert position (cx cy) to viewport 
+                    agent[color] = new_agent
                     cx, cy = w2vp(cx, cy, vpc) 
                     # calculate matrix transformation-rotation
                     MT = get_MT(cx, cy, direction) 
                     # translate points and draw line
-                    translate_point(MT, frame, p1, 0, p2, 0)
-                    translate_point(MT, frame, p3, 0, p4, 0)
+                    new_agent.set_line(translate_point(MT, frame, p1, 0, p2, 0), translate_point(MT, frame, p3, 0, p4, 0))
                     # print('cx', cx, 'cy', cy)
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     return True
@@ -391,23 +397,20 @@ def distance(agent, vx, vy):
 
 
 def translate_point(MT, frame, px1, py1, px2, py2):
-
     P1 = np.array([[px1], [py1], [1]]) 
     P1P = MT.dot(P1)
-    
     P2 = np.array([[px2], [py2], [1]]) 
     P2P = MT.dot(P2)
-    # transform vp2w
-    P1P_vpc_x, P1P_vpc_y = vp2w(int(P1P[0]), int(P1P[1]), vpc)
-    P2P_vpc_x, P2P_vpc_y = vp2w(int(P2P[0]), int(P2P[1]), vpc)
-    
-    
-    P1P_vpv_x, P1P_vpv_y = vp2w(int(P1P[0]), int(P1P[1]), vpv)
-    P2P_vpv_x, P2P_vpv_y = vp2w(int(P2P[0]), int(P2P[1]), vpv) 
-     
-    cv2.line(frame, (P1P_vpc_x, P1P_vpc_y), (P2P_vpc_x, P2P_vpc_y), (255,0, 255), 2) 
-    line = [draw.draw_line((P1P_vpv_x, P1P_vpv_y), (P2P_vpv_x, P2P_vpv_y), color='blue')] 
-    return 
+    # transform vp 2 camera
+    p1p_xc, p1p_yc = vp2w(int(P1P[0]), int(P1P[1]), vpc)
+    p2p_xc, p2p_yc = vp2w(int(P2P[0]), int(P2P[1]), vpc)
+    # transform vp 2 vb
+    p1p_xv, p1p_yv = vp2w(int(P1P[0]), int(P1P[1]), vpv)
+    p2p_xv, p2p_yv = vp2w(int(P2P[0]), int(P2P[1]), vpv) 
+    # draw lines
+    cv2.line(frame, (p1p_xc, p1p_yc), (p2p_xc, p2p_yc), (255,0, 255), 2) 
+    line = [draw.draw_line((p1p_xv, p1p_yv), (p2p_xv, p2p_yv), color='blue')] 
+    return line
 
 
 def get_MT(cx, cy, alpha):
@@ -427,6 +430,22 @@ def get_MT(cx, cy, alpha):
     MT = T.dot(R) 
     return MT
 
+def draw_treshold(frame, radius, ob):
+    r = int(radius + (radius * .2))
+    # get centroid in vpv
+    cv2.circle(frame, (ob.cx, ob.cy), r, (255,0, 255), 3)
+    cxc, cyc = w2vp(ob.cx, ob.cy, vpc)
+    cxv, cyv = vp2w(cxc, cyc, vpv)
+    # get radius in vpv
+    rv, aux = w2vp(r, 0, vpc)
+    rv, aux = vp2w(rv, 0, vpv)
+    circle = [draw.draw_circle((cxv, cyv), rv, fill_color='yellow', line_color='green')]
+    return circle
+
+
+def detect_object(a, b):
+    
+    pass
 
 if __name__=='__main__':
     main()
