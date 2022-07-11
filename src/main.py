@@ -111,25 +111,29 @@ def main():
                     display = [(m.x), (m.y), (m.width), (m.height)]
                      
             # create viewport for video beam projection
-            global vpv
-            # 25 is the error margin for the window
+            global vpv 
             # setting new values to viewport for video beam 
-            vpv.set_values(0, 25, display[2]-25, display[3])
-           
+            x_vb, y_vb = display[2], display[3]
+            # # vpv.set_values(0, 25, x_vb, y_vb)
+            # mark_size = 25
+            # mid_size = mark_size / 2
+            vpv.set_values(0, 0, x_vb, y_vb)
             # draw marks and define rectangle as background
-            im_mark = Image.open('../img/equis.png')
-            im_mark_new = im_mark.resize((25,25)) 
-            layout = [[sg.Graph(((vpv.u_max + 25, vpv.v_max)), (0, 0), (vpv.u_max + 25, vpv.v_max), enable_events=True, key='-GRAPH-', pad=(0,0))]]
-            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(vpv.u_max + 25, vpv.v_max), margins=(0,0)).Finalize()
+            # im_mark = Image.open('../img/equis.png')
+            # im_mark_new = im_mark.resize((mark_size, mark_size)) 
+            layout = [[sg.Graph(((x_vb, y_vb)), (0, 0), (x_vb, y_vb), enable_events=True, key='-GRAPH-', pad=(0,0))]]
+            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(x_vb, y_vb), margins=(0,0)).Finalize()
             virtual_window.Maximize()
             global draw
             draw = virtual_window['-GRAPH-']
             global back
-            back = draw.draw_rectangle((0, vpv.v_max), (vpv.u_max + 25, 0), fill_color='black')
+            back = draw.draw_rectangle((0, y_vb), (x_vb, 0), fill_color='black')
             # ids = [draw.draw_image('../img/eggs.png', location=(randint(0, display[2]-25), randint(0, display[3]-25)))]
-            mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(vpv.u_min, vpv.v_min))]
-            mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(vpv.u_max, vpv.v_max))]  
+            # mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(0, mark_size))]
+            # mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(x_vb - mark_size, y_vb))]  
             
+            mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
+            mark2_centroid = [draw.draw_circle((x_vb - 5, y_vb - 5), 5, fill_color='yellow')]
             
         elif event == 'Stop' and recording == True:
             recording = False
@@ -160,9 +164,6 @@ def main():
                 vpc_max = (w2vp(region[1][0], region[1][1], vpc))  
                 cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min, vpc.v_min), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                 cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max, vpc.v_max), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                # test vp to w function - draw circle
-                vx, vy = vp2w(65, 50, vpc) 
-                cv2.circle(frame, (vx, vy), 10, (255,0,255), 2)
                 # generating masks for other colors
                 if not (generate_mask(frame, hsv_general, 'blue')):
                     agent['blue'] = []
@@ -171,13 +172,8 @@ def main():
                 if not (generate_mask(frame, hsv_general, 'green')):
                     agent['green'] = []
                 # blue follows yellow just for testing
-                # detect_and_follow_agent(frame, 'blue', 'yellow')
-                # window to vp "dog"
-                # x_dog, y_dog = vp2w(65, 50, vpv)
-                # dog = [draw.draw_circle((x_dog, y_dog), 20, fill_color='white', line_color='white')]
-                
-                # cv2.circle(back, (x_dog, y_dog), 100, (255,0,255), 2)
-                
+                # detect_and_follow_agent(frame, 'blue', 'yellow') 
+                 
                 # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
@@ -259,25 +255,31 @@ def generate_mask(frame, hsv, color):
                     
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle, vx, vy = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
-
+                    # get direction of min angle (vertex) represents agent's direction
                     direction = direction_angle(cx, cy, vx, vy)
                     
                     new_agent.set_direction(direction)
                     
                     cv2.putText(frame, str(id_agent), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
-                    # distance between centroid and min angle vertex 
-                    # px, py = w2vp(100, 0, vpc)
-                    # homogeneous_coord(cx, cy, direction, frame, px, py)
-                    # print('cx', cx, 'cy', cy)
-                    print('cx', cx, 'cy', cy)
-                    # homogeneous_coord(cx, cy, direction, frame, 100, 0)
-                    print(distance(new_agent, vx, vy))
+                    # distance between centroid and min angle vertex  
+                    length = distance(new_agent, vx, vy) 
+                    length, aux = w2vp(length, 0, vpc)
+                    length = -1 * length
+                    p1 = length + length / 8
+                    p2 = p1 + length
+                    p3 = -1 * p1
+                    p4 = -1 * p2
+                    # create agent in the world
                     global agent
                     agent[color] = [id_agent, cx, cy, direction] 
                     # convert position (cx cy) to viewport 
                     cx, cy = w2vp(cx, cy, vpc) 
-                    homogeneous_coord(cx, cy, direction, frame, 20, 0)
-                    print('cx', cx, 'cy', cy)
+                    # calculate matrix transformation-rotation
+                    MT = get_MT(cx, cy, direction) 
+                    # translate points and draw line
+                    translate_point(MT, frame, p1, 0, p2, 0)
+                    translate_point(MT, frame, p3, 0, p4, 0)
+                    # print('cx', cx, 'cy', cy)
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     return True
     return
@@ -388,28 +390,12 @@ def distance(agent, vx, vy):
     return value
 
 
-def homogeneous_coord(cx, cy, alpha, frame, px, py):
-    gamma =  alpha * np.pi / 180
-    print ('gamma', gamma)
-    # rotation
-    R = np.array([[np.cos(gamma), - np.sin(gamma)],
-                [np.sin(gamma), np.cos(gamma)],
-                [0, 0]]) 
-    # row = np.array([[0,0]])
-    # R = np.concatenate((R, row), axis = 0)
-    column = np.array([[0], [0], [1]])
-    # final rotation
-    R = np.concatenate((R, column), axis = 1) 
-    # translation
-    P = np.array([[cx], [cy], [1]]) 
-    T = np.array([[1, 0], [0, 1], [0,0]])
-    T = np.concatenate((T, P), axis = 1) 
-    MT = T.dot(R) 
-    P1 = np.array([[px], [py], [1]]) 
+def translate_point(MT, frame, px1, py1, px2, py2):
+
+    P1 = np.array([[px1], [py1], [1]]) 
     P1P = MT.dot(P1)
     
-    P2 = np.array([[-1*px], [py], [1]])
-    print('2', P2)
+    P2 = np.array([[px2], [py2], [1]]) 
     P2P = MT.dot(P2)
     # transform vp2w
     P1P_vpc_x, P1P_vpc_y = vp2w(int(P1P[0]), int(P1P[1]), vpc)
@@ -418,17 +404,29 @@ def homogeneous_coord(cx, cy, alpha, frame, px, py):
     
     P1P_vpv_x, P1P_vpv_y = vp2w(int(P1P[0]), int(P1P[1]), vpv)
     P2P_vpv_x, P2P_vpv_y = vp2w(int(P2P[0]), int(P2P[1]), vpv) 
-    
-    print('x,y 1', P1P_vpv_x,' ', P1P_vpv_y)
-    print('x,y 2', P2P_vpv_x,',',P2P_vpv_y)
-    
-    line = [draw.draw_line((P1P_vpv_x, P1P_vpv_y), (P2P_vpv_x, P2P_vpv_y), color='white')] 
-    
-    cv2.line(frame, (P1P_vpc_x, P1P_vpc_y), (P2P_vpc_x, P2P_vpc_y), (255,0, 255), 3)
-
+     
+    cv2.line(frame, (P1P_vpc_x, P1P_vpc_y), (P2P_vpc_x, P2P_vpc_y), (255,0, 255), 2) 
+    line = [draw.draw_line((P1P_vpv_x, P1P_vpv_y), (P2P_vpv_x, P2P_vpv_y), color='blue')] 
     return 
 
-# print(homogeneous_coord(50, 0))
+
+def get_MT(cx, cy, alpha):
+    gamma =  alpha * np.pi / 180 
+    # rotation
+    R = np.array([[np.cos(gamma), - np.sin(gamma)],
+                [np.sin(gamma), np.cos(gamma)],
+                [0, 0]])   
+    column = np.array([[0], [0], [1]])
+    # final rotation
+    R = np.concatenate((R, column), axis = 1) 
+    # translation
+    P = np.array([[cx], [cy], [1]]) 
+    T = np.array([[1, 0], [0, 1], [0,0]])
+    T = np.concatenate((T, P), axis = 1) 
+    # translation * rotation matrix
+    MT = T.dot(R) 
+    return MT
+
 
 if __name__=='__main__':
     main()
