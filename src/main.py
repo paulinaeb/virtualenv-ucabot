@@ -1,5 +1,6 @@
 import PySimpleGUI as sg
 import cv2
+from matplotlib.pyplot import new_figure_manager
 import numpy as np 
 import math
 import data
@@ -16,7 +17,7 @@ agent = {'yellow': None,
 
 display = [] 
 
-draw = back = 0
+draw = x_vb = y_vb = 0
 
 class ViewPort:
     def __init__(self, name):
@@ -36,6 +37,9 @@ class ViewPort:
 class Agent:
     def __init__(self, color): 
         self.id = get_id(color)
+        self.cx = self.cy = self.direction = self.line2 = self.line1 = self.limit = self.radius = None 
+    def set_radius(self, r):
+        self.radius = r
     def set_centroid(self, cx, cy):
         self.cx = cx
         self.cy = cy
@@ -47,7 +51,7 @@ class Agent:
     def set_limit(self, limit):
         self.limit = limit
     def set_out(self):
-        self.cx = self.cy = self.direction = self.line2 = self.line1 = None    
+        self.cx = self.cy = self.direction = self.line2 = self.line1 = self.limit = self.radius = None    
             
 # viewport for projector
 vpv = ViewPort('video')
@@ -57,28 +61,32 @@ vpc = ViewPort('camera')
 
 # window to viewport function
 def w2vp(x, y, VP):
-    value_x = ((x - VP.u_min) * (data.NEW_MAX_X - data.NEW_MIN_X) / VP.du) + data.NEW_MIN_X
-    value_y = ((VP.v_min - y) * (data.NEW_MAX_Y - data.NEW_MIN_Y) / VP.dv) + data.NEW_MIN_Y
-    return round(value_x), round(value_y)
+    value_x = round(((x - VP.u_min) * (data.NEW_MAX_X - data.NEW_MIN_X) / VP.du) + data.NEW_MIN_X)
+    if y is not None:
+        value_y = round(((VP.v_min - y) * (data.NEW_MAX_Y - data.NEW_MIN_Y) / VP.dv) + data.NEW_MIN_Y)
+        return value_x, value_y 
+    return value_x
+    
 
 # viewport to window function
 def vp2w(x, y, VP):
-    value_x = ((x - data.NEW_MIN_X) * VP.du / (data.NEW_MAX_X - data.NEW_MIN_X)) + VP.u_min
-    diff_y = 0
-    if VP.name == 'camera':
-        diff_y = data.NEW_MIN_Y - y
-    else:
-        diff_y = y - data.NEW_MIN_Y
-    value_y = (diff_y * VP.dv / (data.NEW_MAX_Y - data.NEW_MIN_Y)) + VP.v_min
-    return round(value_x), round(value_y)
-
-
-def image_to_data(im): 
-    with BytesIO() as output:
-        im.save(output, format="PNG")
-        data = output.getvalue()
-    return data
-
+    value_x = round(((x - data.NEW_MIN_X) * VP.du / (data.NEW_MAX_X - data.NEW_MIN_X)) + VP.u_min)
+    if y is not None:
+        diff_y = 0
+        if VP.name == 'camera':
+            diff_y = data.NEW_MIN_Y - y
+        else:
+            diff_y = y - data.NEW_MIN_Y
+        value_y = round((diff_y * VP.dv / (data.NEW_MAX_Y - data.NEW_MIN_Y)) + VP.v_min)
+        return value_x, value_y
+    return value_x
+    
+# def image_to_data(im): 
+#     with BytesIO() as output:
+#         im.save(output, format="PNG")
+#         data = output.getvalue()
+#     return data
+ 
 # it's needed to activate virtual environment before running this
 def main():
     sg.theme('Black')
@@ -118,10 +126,9 @@ def main():
             # create viewport for video beam projection
             global vpv 
             # setting new values to viewport for video beam 
-            x_vb, y_vb = display[2], display[3]
-            # # vpv.set_values(0, 25, x_vb, y_vb)
-            # mark_size = 25
-            # mid_size = mark_size / 2
+            global x_vb
+            global y_vb
+            x_vb, y_vb = display[2], display[3] 
             vpv.set_values(0, 0, x_vb, y_vb)
             # draw marks and define rectangle as background
             # im_mark = Image.open('../img/equis.png')
@@ -130,15 +137,8 @@ def main():
             virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(x_vb, y_vb), margins=(0,0)).Finalize()
             virtual_window.Maximize()
             global draw
-            draw = virtual_window['-GRAPH-']
-            global back
-            back = draw.draw_rectangle((0, y_vb), (x_vb, 0), fill_color='black')
-            # ids = [draw.draw_image('../img/eggs.png', location=(randint(0, display[2]-25), randint(0, display[3]-25)))]
-            # mark1 = [draw.draw_image(data=image_to_data(im_mark_new), location=(0, mark_size))]
-            # mark2 = [draw.draw_image(data=image_to_data(im_mark_new), location=(x_vb - mark_size, y_vb))]  
-            
-            mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
-            mark2_centroid = [draw.draw_circle((x_vb - 5, y_vb - 5), 5, fill_color='yellow')]
+            draw = virtual_window['-GRAPH-'] 
+            draw_marks()
              
         elif event == 'Stop' and recording == True:
             recording = False
@@ -186,11 +186,18 @@ def main():
                     agent['green'].set_out()
                 # blue follows yellow just for testing
                 # detect_and_follow_agent(frame, 'blue', 'yellow') 
-                 
                 # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
+            else:
+                draw.delete_figure('all')
+                draw_marks()
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
 
+
+def draw_marks():
+    mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
+    mark2_centroid = [draw.draw_circle((x_vb - 5, y_vb - 5), 5, fill_color='yellow')]
+    return
             
 # function to generate each mask and draw contours and name of shapes given the color
 def generate_mask(frame, hsv, color):
@@ -267,9 +274,12 @@ def generate_mask(frame, hsv, color):
                     new_agent.set_direction(direction)
                     cv2.putText(frame, str(new_agent.id), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     # distance between centroid and min angle vertex  
-                    length = distance(new_agent, vx, vy) 
-                    new_agent.set_limit(draw_treshold(frame, length, new_agent))
-                    length, aux = w2vp(length, 0, vpc)
+                    length= distance(new_agent, vx, vy) 
+                    # radius of agent limits 
+                    r = int(length + (length * .15))
+                    new_agent.set_radius(r) 
+                    
+                    length = w2vp(length, None, vpc)
                     length = -1 * length
                     p1 = length + length / 25
                     p2 = p1 + length
@@ -280,6 +290,19 @@ def generate_mask(frame, hsv, color):
                     # agent[color] = [id_agent, cx, cy, direction] 
                     # convert position (cx cy) to viewport 
                     agent[color] = new_agent
+                    new_agent.set_limit(draw_treshold(frame, r, new_agent, 'green'))
+                    for a in agent.values():
+                        if a is not None:
+                            if a.id is not new_agent.id:
+                                if a.cx is not None: 
+                                    d = get_distance(a.cx, a.cy, new_agent.cx, new_agent.cy)
+                                    r_sum = a.radius + r
+                                    print('a', new_agent.id,'b',a.id, 'dis', d, 'r sum', r_sum) 
+                                    if d < r_sum: 
+                                        new_agent.set_limit(draw_treshold(frame, r, new_agent, 'red'))
+                                    else:
+                                        new_agent.set_limit(draw_treshold(frame, r, new_agent, 'green'))
+                                        
                     cx, cy = w2vp(cx, cy, vpc) 
                     # calculate matrix transformation-rotation
                     MT = get_MT(cx, cy, direction) 
@@ -386,8 +409,7 @@ def detect_and_follow_agent(frame, follow_agent, followed_agent):
 
 # distance between 2 points (it could be an specific point or a centroid of an agent)
 def get_distance(x1, x2, y1, y2):
-    distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-    print('distance:', distance)
+    distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2) 
     return distance
 
 # distance from centroid to min angle vertex
@@ -408,7 +430,7 @@ def translate_point(MT, frame, px1, py1, px2, py2):
     p1p_xv, p1p_yv = vp2w(int(P1P[0]), int(P1P[1]), vpv)
     p2p_xv, p2p_yv = vp2w(int(P2P[0]), int(P2P[1]), vpv) 
     # draw lines
-    cv2.line(frame, (p1p_xc, p1p_yc), (p2p_xc, p2p_yc), (255,0, 255), 2) 
+    cv2.line(frame, (p1p_xc, p1p_yc), (p2p_xc, p2p_yc), (255, 0, 0), 2) 
     line = [draw.draw_line((p1p_xv, p1p_yv), (p2p_xv, p2p_yv), color='blue')] 
     return line
 
@@ -430,16 +452,18 @@ def get_MT(cx, cy, alpha):
     MT = T.dot(R) 
     return MT
 
-def draw_treshold(frame, radius, ob):
-    r = int(radius + (radius * .2))
+def draw_treshold(frame, r, ob, color): 
     # get centroid in vpv
-    cv2.circle(frame, (ob.cx, ob.cy), r, (255,0, 255), 3)
+    if color == 'green':
+        cv2.circle(frame, (ob.cx, ob.cy), r, (0, 255, 0), 2)
+    else:
+        cv2.circle(frame, (ob.cx, ob.cy), r, (0, 0, 255), 2)
     cxc, cyc = w2vp(ob.cx, ob.cy, vpc)
     cxv, cyv = vp2w(cxc, cyc, vpv)
     # get radius in vpv
-    rv, aux = w2vp(r, 0, vpc)
-    rv, aux = vp2w(rv, 0, vpv)
-    circle = [draw.draw_circle((cxv, cyv), rv, fill_color='yellow', line_color='green')]
+    rv = w2vp(r, None, vpc)
+    rv = vp2w(rv, None, vpv)
+    circle = [draw.draw_circle((cxv, cyv), rv, line_color=color)]
     return circle
 
 
