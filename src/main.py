@@ -1,13 +1,12 @@
 import PySimpleGUI as sg
 import cv2
-from matplotlib.pyplot import new_figure_manager
 import numpy as np 
 import math
 import data
 from screeninfo import get_monitors
-from io import BytesIO
-from random import randint
-from PIL import Image
+import time
+# from io import BytesIO 
+# from PIL import Image
 
 # world variables
 agent = {'yellow': None,
@@ -22,6 +21,7 @@ draw = x_vb = y_vb = 0
 class ViewPort:
     def __init__(self, name):
         self.name = name
+        self.u_min = self.u_max = self.v_min = self.v_max = self.du = self.dv = None
     def set_values(self,  u_min, v_min, u_max, v_max):
         self.u_min = u_min
         self.u_max = u_max     
@@ -61,11 +61,17 @@ vpc = ViewPort('camera')
 
 # window to viewport function
 def w2vp(x, y, VP):
-    value_x = round(((x - VP.u_min) * (data.NEW_MAX_X - data.NEW_MIN_X) / VP.du) + data.NEW_MIN_X)
-    if y is not None:
-        value_y = round(((VP.v_min - y) * (data.NEW_MAX_Y - data.NEW_MIN_Y) / VP.dv) + data.NEW_MIN_Y)
-        return value_x, value_y 
-    return value_x
+    if VP.du > 0:
+        value_x = round(((x - VP.u_min) * (data.NEW_MAX_X - data.NEW_MIN_X) / VP.du) + data.NEW_MIN_X)
+        if y is not None:
+            if VP.dv > 0:
+                value_y = round(((VP.v_min - y) * (data.NEW_MAX_Y - data.NEW_MIN_Y) / VP.dv) + data.NEW_MIN_Y)
+                return value_x, value_y 
+            else:
+                return None
+        return value_x
+    else:
+        return None
     
 
 # viewport to window function
@@ -94,13 +100,12 @@ def main():
     # define the window layout
     layout = [[sg.Text('Virtual Environment', size=(40, 1), justification='center', font='Helvetica 20')],
               [sg.Image(filename='', key='image')],
-              [sg.Button('Start', size=(10, 1), font='Helvetica 14'),
-               sg.Button('Stop', size=(10, 1),  font='Any 14'),
+              [sg.Button('Start', size=(10, 1), font='Helvetica 14'), 
                sg.Button('Exit', size=(10, 1),  font='Helvetica 14')]]
 
 
     # create the window and show it without the plot
-    window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 130))
+    window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 100))
     #indicates which camera use
     cap = cv2.VideoCapture(1)
     recording = False
@@ -138,15 +143,7 @@ def main():
             virtual_window.Maximize()
             global draw
             draw = virtual_window['-GRAPH-'] 
-            draw_marks()
-             
-        elif event == 'Stop' and recording == True:
-            recording = False
-            img = np.full((480, 640), 255) 
-            imgbytes = cv2.imencode('.png', img)[1].tobytes()
-            window['image'].update(data=imgbytes)
-            # closes the camera
-            cap.release()
+            draw_marks() 
         
         if recording: 
             _, frame = cap.read() 
@@ -164,29 +161,30 @@ def main():
                 global vpc 
                 vpc.set_values(region[0][0], region[0][1], region[1][0], region[1][1])
                 # convert limits coordinates to vp
-                vpc_min = (w2vp(region[0][0], region[0][1], vpc))
-                vpc_max = (w2vp(region[1][0], region[1][1], vpc))  
-                cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min, vpc.v_min), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max, vpc.v_max), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                # generating masks for other colors
-                if (not generate_mask(frame, hsv_general, 'blue')) and (agent['blue'] is not None):
-                    draw.delete_figure(agent['blue'].line1)
-                    draw.delete_figure(agent['blue'].line2)
-                    draw.delete_figure(agent['blue'].limit)
-                    agent['blue'].set_out() 
-                if (not generate_mask(frame, hsv_general, 'yellow')) and (agent['yellow'] is not None):
-                    draw.delete_figure(agent['yellow'].line1)
-                    draw.delete_figure(agent['yellow'].line2)
-                    draw.delete_figure(agent['yellow'].limit)
-                    agent['yellow'].set_out()
-                if (not generate_mask(frame, hsv_general, 'green') and (agent['green'] is not None)):
-                    draw.delete_figure(agent['green'].line1)
-                    draw.delete_figure(agent['green'].line2)
-                    draw.delete_figure(agent['green'].limit)
-                    agent['green'].set_out()
-                # blue follows yellow just for testing
-                # detect_and_follow_agent(frame, 'blue', 'yellow') 
-                # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
+                vpc_min  = w2vp(region[0][0], region[0][1], vpc) 
+                vpc_max  = w2vp(region[1][0], region[1][1], vpc)  
+                if (vpc_min and vpc_max):
+                    cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min - 10, vpc.v_min + 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                    cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max - 35, vpc.v_max - 5), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                    # generating masks for other colors
+                    if (not generate_mask(frame, hsv_general, 'blue')) and (agent['blue'] is not None):
+                        draw.delete_figure(agent['blue'].line1)
+                        draw.delete_figure(agent['blue'].line2)
+                        draw.delete_figure(agent['blue'].limit)
+                        agent['blue'].set_out() 
+                    if (not generate_mask(frame, hsv_general, 'yellow')) and (agent['yellow'] is not None):
+                        draw.delete_figure(agent['yellow'].line1)
+                        draw.delete_figure(agent['yellow'].line2)
+                        draw.delete_figure(agent['yellow'].limit)
+                        agent['yellow'].set_out()
+                    if (not generate_mask(frame, hsv_general, 'green')) and (agent['green'] is not None):
+                        draw.delete_figure(agent['green'].line1)
+                        draw.delete_figure(agent['green'].line2)
+                        draw.delete_figure(agent['green'].limit)
+                        agent['green'].set_out()
+                    # blue follows yellow just for testing
+                    # detect_and_follow_agent(frame, 'blue', 'yellow') 
+                    # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
             else:
                 draw.delete_figure('all')
                 draw_marks()
@@ -195,6 +193,7 @@ def main():
 
 
 def draw_marks():
+    back = draw.draw_rectangle((5, 5), ((x_vb - 5, y_vb - 5)), fill_color='black', line_color='white')
     mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
     mark2_centroid = [draw.draw_circle((x_vb - 5, y_vb - 5), 5, fill_color='yellow')]
     return
@@ -265,6 +264,7 @@ def generate_mask(frame, hsv, color):
                     M = cv2.moments(count)
                     cx = int(M['m10'] / M['m00'])
                     cy = int(M['m01'] / M['m00']) 
+                    cv2.circle(frame, (cx, cy), 1, (0, 0, 0))
                     new_agent = Agent(color)
                     new_agent.set_centroid(cx, cy)
                     # get min angle and their coordinates - min_angle - vx - vy
@@ -276,12 +276,11 @@ def generate_mask(frame, hsv, color):
                     # distance between centroid and min angle vertex  
                     length= distance(new_agent, vx, vy) 
                     # radius of agent limits 
-                    r = int(length + (length * .15))
+                    r = int(length + length * .12)
                     new_agent.set_radius(r) 
-                    
                     length = w2vp(length, None, vpc)
                     length = -1 * length
-                    p1 = length + length / 25
+                    p1 = length + (length / 3)
                     p2 = p1 + length
                     p3 = -1 * p1
                     p4 = -1 * p2
@@ -297,7 +296,7 @@ def generate_mask(frame, hsv, color):
                                 if a.cx is not None: 
                                     d = get_distance(a.cx, a.cy, new_agent.cx, new_agent.cy)
                                     r_sum = a.radius + r
-                                    print('a', new_agent.id,'b',a.id, 'dis', d, 'r sum', r_sum) 
+                                    # print('a', new_agent.id,'b',a.id, 'dis', d, 'r sum', r_sum) 
                                     if d < r_sum: 
                                         new_agent.set_limit(draw_treshold(frame, r, new_agent, 'red'))
                                     else:
@@ -329,18 +328,18 @@ def direction_angle(cx, cy, vx, vy):
     # cy and vy are inverted because camera orientation in Y is inverted
     diff_y = cy - vy
     # hypotenuse of the rectangle triangle formed with X and the line between C and min angle V
-    h = math.sqrt((diff_x*diff_x) + (diff_y*diff_y))
+    h = math.sqrt((diff_x * diff_x) + (diff_y * diff_y))
     direction_angle = math.acos (diff_x / h)
     # transform result to degrees
-    direction_angle = int(direction_angle * (180 / math.pi))
+    direction_angle = int(direction_angle * 180 / math.pi)
     if vy > cy:
         direction_angle = 360 - direction_angle 
     return direction_angle
 
 
 def line_length(x1, y1, x2, y2):
-    x_dif = x1-x2
-    y_dif = y1-y2
+    x_dif = x1 - x2
+    y_dif = y1 - y2
     return x_dif * x_dif + y_dif * y_dif
 
 # get all angles of given 3 points of triangle 
@@ -409,7 +408,7 @@ def detect_and_follow_agent(frame, follow_agent, followed_agent):
 
 # distance between 2 points (it could be an specific point or a centroid of an agent)
 def get_distance(x1, x2, y1, y2):
-    distance = math.sqrt((x2 - x1)**2 + (y2 - y1)**2) 
+    distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) 
     return distance
 
 # distance from centroid to min angle vertex
@@ -462,8 +461,8 @@ def draw_treshold(frame, r, ob, color):
     cxv, cyv = vp2w(cxc, cyc, vpv)
     # get radius in vpv
     rv = w2vp(r, None, vpc)
-    rv = vp2w(rv, None, vpv)
-    circle = [draw.draw_circle((cxv, cyv), rv, line_color=color)]
+    rvb = vp2w(rv, None, vpv) 
+    circle = [draw.draw_circle((cxv, cyv), rvb, line_color=color)]
     return circle
 
 

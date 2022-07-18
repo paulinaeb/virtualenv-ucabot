@@ -10,5 +10,6 @@ HSV_COLORS = {
 # viewport new values
 NEW_MIN_X = 0
 NEW_MIN_Y = 0
-NEW_MAX_Y = 100
-NEW_MAX_X = 130
+# real values in cm of projection
+NEW_MAX_Y = 62
+NEW_MAX_X = 104
