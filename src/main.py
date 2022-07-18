@@ -3,8 +3,7 @@ import cv2
 import numpy as np 
 import math
 import data
-from screeninfo import get_monitors
-import time
+from screeninfo import get_monitors 
 # from io import BytesIO 
 # from PIL import Image
 
