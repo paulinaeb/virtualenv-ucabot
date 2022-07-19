@@ -10,12 +10,7 @@ from screeninfo import get_monitors
 # world variables
 agent = {'yellow': None,
          'green': None,
-         'blue': None 
-         }
-
-display = [] 
-
-draw = x_vb = y_vb = 0
+         'blue': None}  
 
 class ViewPort:
     def __init__(self, name):
@@ -32,7 +27,6 @@ class ViewPort:
         else:
             self.dv = v_max - v_min
     
-
 class Agent:
     def __init__(self, color): 
         self.id = get_id(color)
@@ -51,12 +45,6 @@ class Agent:
         self.limit = limit
     def set_out(self):
         self.cx = self.cy = self.direction = self.line2 = self.line1 = self.limit = self.radius = None    
-            
-# viewport for projector
-vpv = ViewPort('video')
-
-# viewport for camera
-vpc = ViewPort('camera')
 
 # window to viewport function
 def w2vp(x, y, VP):
@@ -71,7 +59,6 @@ def w2vp(x, y, VP):
         return value_x
     else:
         return None
-    
 
 # viewport to window function
 def vp2w(x, y, VP):
@@ -85,6 +72,12 @@ def vp2w(x, y, VP):
         value_y = round((diff_y * VP.dv / (data.NEW_MAX_Y - data.NEW_MIN_Y)) + VP.v_min)
         return value_x, value_y
     return value_x
+
+# viewport for projector
+vpv = ViewPort('video')
+
+# viewport for camera
+vpc = ViewPort('camera')
     
 # def image_to_data(im): 
 #     with BytesIO() as output:
@@ -118,27 +111,19 @@ def main():
             return
 
         elif event == 'Start':
+            x_init = 0
             recording = True
             # generate projection
-            for m in get_monitors():
-                global display
-                if m.is_primary is False: 
-                    display = [(m.x), (m.y), (m.width), (m.height)]
-                elif m.is_primary is True: 
-                    display = [(m.x), (m.y), (m.width), (m.height)]
-                     
-            # create viewport for video beam projection
-            global vpv 
-            # setting new values to viewport for video beam 
-            global x_vb
-            global y_vb
-            x_vb, y_vb = display[2], display[3] 
-            vpv.set_values(0, 0, x_vb, y_vb)
-            # draw marks and define rectangle as background
+            for m in get_monitors(): 
+                x_init = m.x
+                global vpv
+                 # set viewport values for projection
+                vpv.set_values(0, 0, m.width, m.height)
+            
             # im_mark = Image.open('../img/equis.png')
             # im_mark_new = im_mark.resize((mark_size, mark_size)) 
-            layout = [[sg.Graph(((x_vb, y_vb)), (0, 0), (x_vb, y_vb), enable_events=True, key='-GRAPH-', pad=(0,0))]]
-            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(display[0],0), size=(x_vb, y_vb), margins=(0,0)).Finalize()
+            layout = [[sg.Graph(((vpv.u_max, vpv.v_max)), (0, 0), (vpv.u_max, vpv.v_max), enable_events=True, key='-GRAPH-', pad=(0,0))]]
+            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(x_init,0), size=(vpv.u_max, vpv.v_max), margins=(0,0)).Finalize()
             virtual_window.Maximize()
             global draw
             draw = virtual_window['-GRAPH-'] 
@@ -190,11 +175,11 @@ def main():
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
 
-
+# draw marks and define rectangle as background
 def draw_marks():
-    back = draw.draw_rectangle((5, 5), ((x_vb - 5, y_vb - 5)), fill_color='black', line_color='white')
+    back = draw.draw_rectangle((5, 5), ((vpv.u_max - 5, vpv.v_max - 5)), fill_color='black', line_color='white')
     mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
-    mark2_centroid = [draw.draw_circle((x_vb - 5, y_vb - 5), 5, fill_color='yellow')]
+    mark2_centroid = [draw.draw_circle((vpv.u_max - 5, vpv.v_max - 5), 5, fill_color='yellow')]
     return
             
 # function to generate each mask and draw contours and name of shapes given the color
