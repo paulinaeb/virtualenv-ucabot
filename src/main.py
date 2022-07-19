@@ -85,101 +85,11 @@ vpc = ViewPort('camera')
 #         data = output.getvalue()
 #     return data
  
-# it's needed to activate virtual environment before running this
-def main():
-    sg.theme('Black')
-
-    # define the window layout
-    layout = [[sg.Text('Virtual Environment', size=(40, 1), justification='center', font='Helvetica 20')],
-              [sg.Image(filename='', key='image')],
-              [sg.Button('Start', size=(10, 1), font='Helvetica 14'), 
-               sg.Button('Exit', size=(10, 1),  font='Helvetica 14')]]
-
-
-    # create the window and show it without the plot
-    window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 100))
-    #indicates which camera use
-    cap = cv2.VideoCapture(1)
-    recording = False
-    # Event loop Read and display frames, operate the GUI 
-    while True:
-        event, values = window.read(timeout=20) 
-        
-        if event == 'Exit' or event == sg.WIN_CLOSED:
-            if recording:
-                cap.release()
-            return
-
-        elif event == 'Start':
-            x_init = 0
-            recording = True
-            # generate projection
-            for m in get_monitors(): 
-                x_init = m.x
-                global vpv
-                 # set viewport values for projection
-                vpv.set_values(0, 0, m.width, m.height)
-            
-            # im_mark = Image.open('../img/equis.png')
-            # im_mark_new = im_mark.resize((mark_size, mark_size)) 
-            layout = [[sg.Graph(((vpv.u_max, vpv.v_max)), (0, 0), (vpv.u_max, vpv.v_max), enable_events=True, key='-GRAPH-', pad=(0,0))]]
-            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(x_init,0), size=(vpv.u_max, vpv.v_max), margins=(0,0)).Finalize()
-            virtual_window.Maximize()
-            global draw
-            draw = virtual_window['-GRAPH-'] 
-            draw_marks() 
-        
-        if recording: 
-            _, frame = cap.read() 
-            # converting image obtained to hsv, if exists
-            if frame is None:
-                print('Something went wrong trying to connect to your camera. Please verify.')
-                return
-            else:
-                hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-            # generate mask to define region of interest (viewport)
-            region = generate_mask(frame, hsv_general, 'black')
-            # if two black marks exist 
-            if region:    
-                # calculates and shows origin and max limit of viewport 
-                global vpc 
-                vpc.set_values(region[0][0], region[0][1], region[1][0], region[1][1])
-                # convert limits coordinates to vp
-                vpc_min  = w2vp(region[0][0], region[0][1], vpc) 
-                vpc_max  = w2vp(region[1][0], region[1][1], vpc)  
-                if (vpc_min and vpc_max):
-                    cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min - 10, vpc.v_min + 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                    cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max - 35, vpc.v_max - 5), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                    # generating masks for other colors
-                    if (not generate_mask(frame, hsv_general, 'blue')) and (agent['blue'] is not None):
-                        draw.delete_figure(agent['blue'].line1)
-                        draw.delete_figure(agent['blue'].line2)
-                        draw.delete_figure(agent['blue'].limit)
-                        agent['blue'].set_out() 
-                    if (not generate_mask(frame, hsv_general, 'yellow')) and (agent['yellow'] is not None):
-                        draw.delete_figure(agent['yellow'].line1)
-                        draw.delete_figure(agent['yellow'].line2)
-                        draw.delete_figure(agent['yellow'].limit)
-                        agent['yellow'].set_out()
-                    if (not generate_mask(frame, hsv_general, 'green')) and (agent['green'] is not None):
-                        draw.delete_figure(agent['green'].line1)
-                        draw.delete_figure(agent['green'].line2)
-                        draw.delete_figure(agent['green'].limit)
-                        agent['green'].set_out()
-                    # blue follows yellow just for testing
-                    # detect_and_follow_agent(frame, 'blue', 'yellow') 
-                    # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))]
-            else:
-                draw.delete_figure('all')
-                draw_marks()
-            imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
-            window['image'].update(data=imgbytes)
-
 # draw marks and define rectangle as background
 def draw_marks():
-    back = draw.draw_rectangle((5, 5), ((vpv.u_max - 5, vpv.v_max - 5)), fill_color='black', line_color='white')
+    back = draw.draw_rectangle((5, 5), ((vpv.u_max, vpv.v_max)), fill_color='black', line_color='white')
     mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
-    mark2_centroid = [draw.draw_circle((vpv.u_max - 5, vpv.v_max - 5), 5, fill_color='yellow')]
+    mark2_centroid = [draw.draw_circle((vpv.u_max, vpv.v_max), 5, fill_color='yellow')]
     return
             
 # function to generate each mask and draw contours and name of shapes given the color
@@ -294,6 +204,7 @@ def generate_mask(frame, hsv, color):
                     # print('cx', cx, 'cy', cy)
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     return True
+
     return
 
 # get if of robots in function of color given
@@ -453,6 +364,101 @@ def draw_treshold(frame, r, ob, color):
 def detect_object(a, b):
     
     pass
+
+
+# it's needed to activate virtual environment before running this
+def main():
+    sg.theme('Black')
+
+    # define the window layout
+    layout = [[sg.Text('Virtual Environment', size=(40, 1), justification='center', font='Helvetica 20')],
+              [sg.Image(filename='', key='image')],
+              [sg.Button('Start', size=(10, 1), font='Helvetica 14'), 
+               sg.Button('Exit', size=(10, 1),  font='Helvetica 14')]] 
+
+    # create the window and show it without the plot
+    window = sg.Window('Virtual Environment', layout, element_justification='c', location=(350, 100))
+    #indicates which camera use
+    cap = cv2.VideoCapture(1)
+    recording = False
+    # Event loop Read and display frames, operate the GUI 
+    while True:
+        event, values = window.read(timeout=20) 
+        
+        if event == 'Exit' or event == sg.WIN_CLOSED:
+            if recording:
+                cap.release()
+            return
+
+        elif event == 'Start':
+            x_init = 0
+            recording = True
+            # generate projection
+            for m in get_monitors(): 
+                x_init = m.x
+                global vpv
+                 # set viewport values for projection
+                vpv.set_values(5, 5, m.width - 5, m.height - 5) 
+            # im_mark = Image.open('../img/equis.png')
+            # im_mark_new = im_mark.resize((mark_size, mark_size)) 
+            layout = [[sg.Graph((vpv.u_max + 5, vpv.v_max + 5), (0, 0), (vpv.u_max + 5, vpv.v_max + 5), enable_events=True, key='-GRAPH-', pad=(0,0))]]
+            virtual_window = sg.Window('Virtual world', layout, no_titlebar=True, finalize=True, location=(x_init,0), size=(vpv.u_max + 5, vpv.v_max + 5), margins=(0,0)).Finalize()
+            virtual_window.Maximize() 
+            global draw
+            draw = virtual_window['-GRAPH-']  
+            
+        if recording: 
+            _, frame = cap.read() 
+            # converting image obtained to hsv, if exists
+            if frame is None:
+                print('Something went wrong trying to connect to your camera. Please verify.')
+                return
+            else:
+                hsv_general = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            # generate mask to define region of interest (viewport)
+            region = generate_mask(frame, hsv_general, 'black') 
+            # if two black marks exist 
+            if region:    
+                # calculates and shows origin and max limit of viewport 
+                global vpc 
+                vpc.set_values(region[0][0], region[0][1], region[1][0], region[1][1])
+                
+                cx, cy = vp2w(30, 30, vpc)
+                cx2, cy2 = vp2w(30, 30, vpv)
+                fig = [draw.draw_circle((cx2, cy2), 5, fill_color='yellow')]
+                cv2.circle(frame, (cx,cy), 5, (255,255,255))
+                
+                # convert limits coordinates to vp
+                vpc_min  = w2vp(region[0][0], region[0][1], vpc) 
+                vpc_max  = w2vp(region[1][0], region[1][1], vpc)  
+                if (vpc_min and vpc_max):
+                    cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min - 10, vpc.v_min + 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                    cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max - 35, vpc.v_max - 5), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                    # generating masks for other colors
+                    if (not generate_mask(frame, hsv_general, 'blue')) and (agent['blue'] is not None):
+                        draw.delete_figure(agent['blue'].line1)
+                        draw.delete_figure(agent['blue'].line2)
+                        draw.delete_figure(agent['blue'].limit)
+                        agent['blue'].set_out() 
+                    if (not generate_mask(frame, hsv_general, 'yellow')) and (agent['yellow'] is not None):
+                        draw.delete_figure(agent['yellow'].line1)
+                        draw.delete_figure(agent['yellow'].line2)
+                        draw.delete_figure(agent['yellow'].limit)
+                        agent['yellow'].set_out()
+                    if (not generate_mask(frame, hsv_general, 'green')) and (agent['green'] is not None):
+                        draw.delete_figure(agent['green'].line1)
+                        draw.delete_figure(agent['green'].line2)
+                        draw.delete_figure(agent['green'].limit)
+                        agent['green'].set_out()
+                    # blue follows yellow just for testing
+                    # detect_and_follow_agent(frame, 'blue', 'yellow') 
+                    # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))] 
+            else:
+                draw.delete_figure('all')
+                draw_marks()
+            imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
+            window['image'].update(data=imgbytes)
+
 
 if __name__=='__main__':
     main()
