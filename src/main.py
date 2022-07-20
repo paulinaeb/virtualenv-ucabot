@@ -1,3 +1,4 @@
+from operator import length_hint
 import PySimpleGUI as sg
 import cv2
 import numpy as np 
@@ -49,10 +50,10 @@ class Agent:
 # window to viewport function
 def w2vp(x, y, VP):
     if VP.du > 0:
-        value_x = round(((x - VP.u_min) * (data.NEW_MAX_X - data.NEW_MIN_X) / VP.du) + data.NEW_MIN_X)
+        value_x = round(((x - VP.u_min) * (data.NEW_MAX_X - data.NEW_MIN_X) / VP.du) + data.NEW_MIN_X, 2)
         if y is not None:
             if VP.dv > 0:
-                value_y = round(((VP.v_min - y) * (data.NEW_MAX_Y - data.NEW_MIN_Y) / VP.dv) + data.NEW_MIN_Y)
+                value_y = round(((VP.v_min - y) * (data.NEW_MAX_Y - data.NEW_MIN_Y) / VP.dv) + data.NEW_MIN_Y, 2)
                 return value_x, value_y 
             else:
                 return None
@@ -62,14 +63,14 @@ def w2vp(x, y, VP):
 
 # viewport to window function
 def vp2w(x, y, VP):
-    value_x = round(((x - data.NEW_MIN_X) * VP.du / (data.NEW_MAX_X - data.NEW_MIN_X)) + VP.u_min)
+    value_x = round(((x - data.NEW_MIN_X) * VP.du / (data.NEW_MAX_X - data.NEW_MIN_X)) + VP.u_min, 2)
     if y is not None:
         diff_y = 0
         if VP.name == 'camera':
             diff_y = data.NEW_MIN_Y - y
         else:
             diff_y = y - data.NEW_MIN_Y
-        value_y = round((diff_y * VP.dv / (data.NEW_MAX_Y - data.NEW_MIN_Y)) + VP.v_min)
+        value_y = round((diff_y * VP.dv / (data.NEW_MAX_Y - data.NEW_MIN_Y)) + VP.v_min, 2)
         return value_x, value_y
     return value_x
 
@@ -112,9 +113,9 @@ def generate_mask(frame, hsv, color):
             if len(approx) == 4 and color == 'black': 
                 # computes the centroid of shapes
                 M = cv2.moments(count)
-                cx = int(M['m10'] / M['m00'])
-                cy = int(M['m01'] / M['m00'])
-                cv2.circle(frame, (cx,cy), 2, (255,255,255), 2)
+                cx = round(M['m10'] / M['m00'], 2)
+                cy = round(M['m01'] / M['m00'], 2)
+                cv2.circle(frame, (int(cx),int(cy)), 2, (255,255,255), 2)
                 # rectangles - marks
                 if num_corner == 0:
                     first_corner.append(cx)
@@ -125,7 +126,7 @@ def generate_mask(frame, hsv, color):
                     second_corner.append(cy)
                     num_corner = num_corner + 1 
                     # draws the region of interest as a rectangle
-                    cv2.rectangle(frame, (first_corner[0], first_corner[1]), (second_corner[0], second_corner[1]), (255,255,255), 2)
+                    cv2.rectangle(frame, (int(first_corner[0]), int(first_corner[1])), (int(second_corner[0]), int(second_corner[1])), (255,255,255), 2)
                     return first_corner, second_corner
                 elif num_corner == 2:
                     # reset values
@@ -156,23 +157,28 @@ def generate_mask(frame, hsv, color):
                     cv2.drawContours(frame, [approx],0, (0), 2)
                     # computes the centroid of shapes
                     M = cv2.moments(count)
-                    cx = int(M['m10'] / M['m00'])
-                    cy = int(M['m01'] / M['m00']) 
-                    cv2.circle(frame, (cx, cy), 1, (0, 0, 0))
+                    cx = round(M['m10'] / M['m00'], 2)
+                    cy = round(M['m01'] / M['m00'], 2) 
+                    cv2.circle(frame, (int(cx), int(cy)), 1, (0, 0, 0))
                     new_agent = Agent(color)
                     new_agent.set_centroid(cx, cy)
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle, vx, vy = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
                     # get direction of min angle (vertex) represents agent's direction
                     direction = direction_angle(cx, cy, vx, vy)
+                    
+                    print('angle', direction)
+                    print('first cx', cx, 'cy', cy)
                     new_agent.set_direction(direction)
-                    cv2.putText(frame, str(new_agent.id), (cx, cy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    cv2.putText(frame, str(new_agent.id), (int(cx), int(cy)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     # distance between centroid and min angle vertex  
                     length= distance(new_agent, vx, vy) 
+                    print('distance', length)
                     # radius of agent limits 
-                    r = int(length + length * .12)
+                    r = round(length + length * .12, 2)
                     new_agent.set_radius(r) 
                     length = w2vp(length, None, vpc)
+                    print('length', length)
                     length = -1 * length
                     p1 = length + (length / 3)
                     p2 = p1 + length
@@ -201,7 +207,7 @@ def generate_mask(frame, hsv, color):
                     MT = get_MT(cx, cy, direction) 
                     # translate points and draw line
                     new_agent.set_line(translate_point(MT, frame, p1, 0, p2, 0), translate_point(MT, frame, p3, 0, p4, 0))
-                    # print('cx', cx, 'cy', cy)
+                    print('cx', cx, 'cy', cy)
                     cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     return True
 
@@ -226,7 +232,7 @@ def direction_angle(cx, cy, vx, vy):
     h = math.sqrt((diff_x * diff_x) + (diff_y * diff_y))
     direction_angle = math.acos (diff_x / h)
     # transform result to degrees
-    direction_angle = int(direction_angle * 180 / math.pi)
+    direction_angle = round(direction_angle * 180 / math.pi, 2)
     if vy > cy:
         direction_angle = 360 - direction_angle 
     return direction_angle
@@ -254,9 +260,9 @@ def get_angle(x1, y1, x2, y2, x3, y3):
     beta = math.acos((a2 + c2 -b2) / (2 * a * c))
     gamma = math.acos((a2 + b2 - c2) / (2 * a * b))
     # Converting to degree
-    alpha = int(alpha * 180 / math.pi);
-    beta = int(beta * 180 / math.pi);
-    gamma = int(gamma * 180 / math.pi);
+    alpha = round(alpha * 180 / math.pi, 2);
+    beta = round(beta * 180 / math.pi, 2);
+    gamma = round(gamma * 180 / math.pi, 2);
     
     # return lower angle and its coordinates
     if gamma > alpha < beta: 
@@ -303,12 +309,12 @@ def detect_and_follow_agent(frame, follow_agent, followed_agent):
 
 # distance between 2 points (it could be an specific point or a centroid of an agent)
 def get_distance(x1, x2, y1, y2):
-    distance = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2) 
+    distance = round(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2), 2)
     return distance
 
 # distance from centroid to min angle vertex
 def distance(agent, vx, vy):
-    value = math.sqrt((agent.cx - vx)**2 + (agent.cy - vy)**2)
+    value = round(math.sqrt((agent.cx - vx)**2 + (agent.cy - vy)**2), 2)
     return value
 
 
@@ -324,7 +330,7 @@ def translate_point(MT, frame, px1, py1, px2, py2):
     p1p_xv, p1p_yv = vp2w(int(P1P[0]), int(P1P[1]), vpv)
     p2p_xv, p2p_yv = vp2w(int(P2P[0]), int(P2P[1]), vpv) 
     # draw lines
-    cv2.line(frame, (p1p_xc, p1p_yc), (p2p_xc, p2p_yc), (255, 0, 0), 2) 
+    cv2.line(frame, (int(p1p_xc), int(p1p_yc)), (int(p2p_xc), int(p2p_yc)), (255, 0, 0), 2) 
     line = [draw.draw_line((p1p_xv, p1p_yv), (p2p_xv, p2p_yv), color='blue')] 
     return line
 
@@ -349,9 +355,9 @@ def get_MT(cx, cy, alpha):
 def draw_treshold(frame, r, ob, color): 
     # get centroid in vpv
     if color == 'green':
-        cv2.circle(frame, (ob.cx, ob.cy), r, (0, 255, 0), 2)
+        cv2.circle(frame, (int(ob.cx), int(ob.cy)), int(r), (0, 255, 0), 2)
     else:
-        cv2.circle(frame, (ob.cx, ob.cy), r, (0, 0, 255), 2)
+        cv2.circle(frame, (int(ob.cx), int(ob.cy)), int(r), (0, 0, 255), 2)
     cxc, cyc = w2vp(ob.cx, ob.cy, vpc)
     cxv, cyv = vp2w(cxc, cyc, vpv)
     # get radius in vpv
@@ -364,6 +370,17 @@ def draw_treshold(frame, r, ob, color):
 def detect_object(a, b):
     
     pass
+
+# generates masks for all agent colors and clears projection when needed
+def clear_figures(frame, hsv_general):
+    for color in agent.keys():
+        if (not generate_mask(frame, hsv_general, color)) and (agent[color] is not None):
+            if not one_monitor:
+                draw.delete_figure(agent[color].line1)
+                draw.delete_figure(agent[color].line2)
+                draw.delete_figure(agent[color].limit)
+            agent[color].set_out()
+    return
 
 
 # it's needed to activate virtual environment before running this
@@ -395,9 +412,11 @@ def main():
             recording = True
             # generate projection
             for m in get_monitors(): 
+                global one_monitor
+                one_monitor = m.is_primary
                 x_init = m.x
                 global vpv
-                 # set viewport values for projection
+                 # set viewport values for projection 
                 vpv.set_values(5, 5, m.width - 5, m.height - 5) 
             # im_mark = Image.open('../img/equis.png')
             # im_mark_new = im_mark.resize((mark_size, mark_size)) 
@@ -418,47 +437,30 @@ def main():
             # generate mask to define region of interest (viewport)
             region = generate_mask(frame, hsv_general, 'black') 
             # if two black marks exist 
-            if region:    
+            if region:   
+                # print('region',region) 
                 # calculates and shows origin and max limit of viewport 
                 global vpc 
-                vpc.set_values(region[0][0], region[0][1], region[1][0], region[1][1])
-                
-                cx, cy = vp2w(30, 30, vpc)
-                cx2, cy2 = vp2w(30, 30, vpv)
-                fig = [draw.draw_circle((cx2, cy2), 5, fill_color='yellow')]
-                cv2.circle(frame, (cx,cy), 5, (255,255,255))
-                
+                vpc.set_values(region[0][0], region[0][1], region[1][0], region[1][1]) 
                 # convert limits coordinates to vp
                 vpc_min  = w2vp(region[0][0], region[0][1], vpc) 
                 vpc_max  = w2vp(region[1][0], region[1][1], vpc)  
                 if (vpc_min and vpc_max):
-                    cv2.putText(frame, (str(vpc_min[0])+','+str(vpc_min[1])), (vpc.u_min - 10, vpc.v_min + 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                    cv2.putText(frame, (str(vpc_max[0])+','+str(vpc_max[1])), (vpc.u_max - 35, vpc.v_max - 5), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
-                    # generating masks for other colors
-                    if (not generate_mask(frame, hsv_general, 'blue')) and (agent['blue'] is not None):
-                        draw.delete_figure(agent['blue'].line1)
-                        draw.delete_figure(agent['blue'].line2)
-                        draw.delete_figure(agent['blue'].limit)
-                        agent['blue'].set_out() 
-                    if (not generate_mask(frame, hsv_general, 'yellow')) and (agent['yellow'] is not None):
-                        draw.delete_figure(agent['yellow'].line1)
-                        draw.delete_figure(agent['yellow'].line2)
-                        draw.delete_figure(agent['yellow'].limit)
-                        agent['yellow'].set_out()
-                    if (not generate_mask(frame, hsv_general, 'green')) and (agent['green'] is not None):
-                        draw.delete_figure(agent['green'].line1)
-                        draw.delete_figure(agent['green'].line2)
-                        draw.delete_figure(agent['green'].limit)
-                        agent['green'].set_out()
+                    cv2.putText(frame, (str(int(vpc_min[0]))+','+str(int(vpc_min[1]))), (int(vpc.u_min) - 10, int(vpc.v_min) + 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                    cv2.putText(frame, (str(int(vpc_max[0]))+','+str(int(vpc_max[1]))), (int(vpc.u_max) - 70, int(vpc.v_max) - 5), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
+                    # generating masks for all agent colors and clearing screen (vb) when needed
+                    clear_figures(frame, hsv_general) 
                     # blue follows yellow just for testing
                     # detect_and_follow_agent(frame, 'blue', 'yellow') 
                     # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))] 
-            else:
+            elif (not region) and (not one_monitor): 
                 draw.delete_figure('all')
-                draw_marks()
+                draw_marks()  
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
             window['image'].update(data=imgbytes)
 
 
 if __name__=='__main__':
     main()
+    
+    
