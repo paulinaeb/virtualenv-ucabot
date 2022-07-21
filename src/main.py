@@ -111,10 +111,8 @@ def generate_mask(frame, hsv, color):
         if area > 10:
             # recognize triangles or rectangles 
             if len(approx) == 4 and color == 'black': 
-                # computes the centroid of shapes
-                M = cv2.moments(count)
-                cx = round(M['m10'] / M['m00'], 2)
-                cy = round(M['m01'] / M['m00'], 2)
+                # computes the centroid of shapes 
+                cx, cy = centroid(count)
                 cv2.circle(frame, (int(cx),int(cy)), 2, (255,255,255), 2)
                 # rectangles - marks
                 if num_corner == 0:
@@ -154,19 +152,15 @@ def generate_mask(frame, hsv, color):
                         y_point.append(y)
                     i = i + 1
                 if flag == 3 : 
-                    cv2.drawContours(frame, [approx],0, (0), 2)
-                    # computes the centroid of shapes
-                    M = cv2.moments(count)
-                    cx = round(M['m10'] / M['m00'], 2)
-                    cy = round(M['m01'] / M['m00'], 2) 
-                    cv2.circle(frame, (int(cx), int(cy)), 1, (0, 0, 0))
+                    cv2.drawContours(frame, [approx], 0, (0), 2)
+                    # computes the centroid of shapes  
+                    cx, cy = centroid(count)
                     new_agent = Agent(color)
                     new_agent.set_centroid(cx, cy)
                     # get min angle and their coordinates - min_angle - vx - vy
                     min_angle, vx, vy = get_angle(x_point[0], y_point[0], x_point[1], y_point[1], x_point[2], y_point[2])
                     # get direction of min angle (vertex) represents agent's direction
                     direction = direction_angle(cx, cy, vx, vy)
-                    
                     print('angle', direction)
                     print('first cx', cx, 'cy', cy)
                     new_agent.set_direction(direction)
@@ -208,7 +202,11 @@ def generate_mask(frame, hsv, color):
                     # translate points and draw line
                     new_agent.set_line(translate_point(MT, frame, p1, 0, p2, 0), translate_point(MT, frame, p3, 0, p4, 0))
                     print('cx', cx, 'cy', cy)
-                    cv2.putText(frame,str(direction)+' '+str(cx)+' '+ str(cy), (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    info = str(direction)+' | '+str(cx)+' | '+ str(cy)
+                    cv2.putText(frame, info, (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
+                    vx, vy = w2vp(vx, vy, vpc)
+                    vx, vy = vp2w(vx, vy, vpv)
+                    draw.draw_text(text = info, location = (vx, vy), color = 'white')
                     return True
 
     return
@@ -296,14 +294,15 @@ def rotate(agent, current_angle, degrees_to_rotate, direction):
         return result_angle, m1, m2
 
 # verify if agents exist on viewport
-def detect_and_follow_agent(frame, follow_agent, followed_agent):
-    if agent[follow_agent] and agent[followed_agent]:
+# a is the agent that follows and b which is followed 
+def detect_and_follow_agent(frame, a, b): 
+    if agent[a] and agent[b]:
         # point where I wish to go
-        cv2.line(frame, (agent[follow_agent][1], agent[follow_agent][2]), (agent[followed_agent][1], agent[followed_agent][2]), (255,0,0), 2)
-        temp = direction_angle(agent[follow_agent][1], agent[follow_agent][2], agent[followed_agent][1], agent[followed_agent][2])
-        angle_to_point = temp - agent[follow_agent][3]
-        print('angle to point ', angle_to_point)
-        cv2.putText(frame,str(angle_to_point), (agent[followed_agent][1], agent[followed_agent][2]), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255,255,255))
+        if agent[a].cx and agent[b].cx:
+            cv2.line(frame, (int(agent[a].cx), int(agent[a].cy)), (int(agent[b].cx), int(agent[b].cy)), (255, 0, 0), 2)
+            temp = direction_angle(agent[a].cx, agent[a].cy, agent[b].cx, agent[b].cy)
+            angle_to_point = round(temp - agent[a].direction, 2)
+            cv2.putText(frame, str(angle_to_point), (int(agent[b].cx), int(agent[b].cy)), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
     else:
         return False
 
@@ -316,6 +315,13 @@ def get_distance(x1, x2, y1, y2):
 def distance(agent, vx, vy):
     value = round(math.sqrt((agent.cx - vx)**2 + (agent.cy - vy)**2), 2)
     return value
+
+
+def centroid(count):
+    M = cv2.moments(count)
+    cx = round(M['m10'] / M['m00'], 2)
+    cy = round(M['m01'] / M['m00'], 2)  
+    return cx, cy
 
 
 def translate_point(MT, frame, px1, py1, px2, py2):
@@ -374,11 +380,11 @@ def detect_object(a, b):
 # generates masks for all agent colors and clears projection when needed
 def clear_figures(frame, hsv_general):
     for color in agent.keys():
-        if (not generate_mask(frame, hsv_general, color)) and (agent[color] is not None):
-            if not one_monitor:
-                draw.delete_figure(agent[color].line1)
-                draw.delete_figure(agent[color].line2)
-                draw.delete_figure(agent[color].limit)
+        if not generate_mask(frame, hsv_general, color) and agent[color] is not None:
+            # if not one_monitor: 
+            draw.delete_figure(agent[color].line1)
+            draw.delete_figure(agent[color].line2)
+            draw.delete_figure(agent[color].limit)
             agent[color].set_out()
     return
 
@@ -425,8 +431,10 @@ def main():
             virtual_window.Maximize() 
             global draw
             draw = virtual_window['-GRAPH-']  
+            # print(dir(draw))
             
         if recording: 
+            cap.set(cv2.CAP_PROP_AUTOFOCUS, 0) # turn the autofocus off
             _, frame = cap.read() 
             # converting image obtained to hsv, if exists
             if frame is None:
@@ -453,7 +461,7 @@ def main():
                     # blue follows yellow just for testing
                     # detect_and_follow_agent(frame, 'blue', 'yellow') 
                     # ids = [draw.draw_image('../img/eggs.png', location=(x_dog, y_dog))] 
-            elif (not region) and (not one_monitor): 
+            else: 
                 draw.delete_figure('all')
                 draw_marks()  
             imgbytes = cv2.imencode('.png', frame)[1].tobytes() 
