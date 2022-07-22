@@ -31,7 +31,7 @@ class ViewPort:
 class Agent:
     def __init__(self, color): 
         self.id = get_id(color)
-        self.cx = self.cy = self.direction = self.line2 = self.line1 = self.limit = self.radius = None 
+        self.cx = self.cy = self.direction = self.line2 = self.line1 = self.limit = self.radius = self.info = None 
     def set_radius(self, r):
         self.radius = r
     def set_centroid(self, cx, cy):
@@ -44,8 +44,10 @@ class Agent:
         self.line2 = line2
     def set_limit(self, limit):
         self.limit = limit
+    def set_info(self, info):
+        self.info = info
     def set_out(self):
-        self.cx = self.cy = self.direction = self.line2 = self.line1 = self.limit = self.radius = None    
+        self.cx = self.cy = self.direction = self.line2 = self.line1 = self.limit = self.radius = self.info = None    
 
 # window to viewport function
 def w2vp(x, y, VP):
@@ -88,7 +90,7 @@ vpc = ViewPort('camera')
  
 # draw marks and define rectangle as background
 def draw_marks():
-    back = draw.draw_rectangle((5, 5), ((vpv.u_max, vpv.v_max)), fill_color='black', line_color='white')
+    back = draw.draw_rectangle((5, 5), ((vpv.u_max, vpv.v_max)), fill_color='black', line_color='gray')
     mark1_centroid = [draw.draw_circle((5, 5), 5, fill_color='yellow')]
     mark2_centroid = [draw.draw_circle((vpv.u_max, vpv.v_max), 5, fill_color='yellow')]
     return
@@ -203,10 +205,11 @@ def generate_mask(frame, hsv, color):
                     new_agent.set_line(translate_point(MT, frame, p1, 0, p2, 0), translate_point(MT, frame, p3, 0, p4, 0))
                     print('cx', cx, 'cy', cy)
                     info = str(direction)+' | '+str(cx)+' | '+ str(cy)
+                    new_agent.set_info(info)
                     cv2.putText(frame, info, (vx, vy), cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 0)) 
                     vx, vy = w2vp(vx, vy, vpc)
                     vx, vy = vp2w(vx, vy, vpv)
-                    draw.draw_text(text = info, location = (vx, vy), color = 'white')
+                    draw.draw_text(text = info, location = (vx, vy), color = 'gray')
                     return True
 
     return
@@ -380,11 +383,12 @@ def detect_object(a, b):
 # generates masks for all agent colors and clears projection when needed
 def clear_figures(frame, hsv_general):
     for color in agent.keys():
-        if not generate_mask(frame, hsv_general, color) and agent[color] is not None:
-            # if not one_monitor: 
+        if (not generate_mask(frame, hsv_general, color)) and (agent[color] is not None):
+            # if not one_monitor:  
             draw.delete_figure(agent[color].line1)
             draw.delete_figure(agent[color].line2)
             draw.delete_figure(agent[color].limit)
+            draw.delete_figure(agent[color].info)
             agent[color].set_out()
     return
 
@@ -431,7 +435,7 @@ def main():
             virtual_window.Maximize() 
             global draw
             draw = virtual_window['-GRAPH-']  
-            # print(dir(draw))
+            #print(dir(draw))
             
         if recording: 
             cap.set(cv2.CAP_PROP_AUTOFOCUS, 0) # turn the autofocus off
@@ -453,7 +457,7 @@ def main():
                 # convert limits coordinates to vp
                 vpc_min  = w2vp(region[0][0], region[0][1], vpc) 
                 vpc_max  = w2vp(region[1][0], region[1][1], vpc)  
-                if (vpc_min and vpc_max):
+                if vpc_min and vpc_max:
                     cv2.putText(frame, (str(int(vpc_min[0]))+','+str(int(vpc_min[1]))), (int(vpc.u_min) - 10, int(vpc.v_min) + 15), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                     cv2.putText(frame, (str(int(vpc_max[0]))+','+str(int(vpc_max[1]))), (int(vpc.u_max) - 70, int(vpc.v_max) - 5), cv2.FONT_HERSHEY_COMPLEX, 0.5, (255, 255, 255))
                     # generating masks for all agent colors and clearing screen (vb) when needed
